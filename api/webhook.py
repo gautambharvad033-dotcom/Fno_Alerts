@@ -1,6 +1,9 @@
+from flask import Flask, request, jsonify
 import requests
 import datetime
 import json
+
+app = Flask(__name__)
 
 BOT_TOKEN = "8613392574:AAF83_86w1TGHdYuZF5ZXjwQPJQD8ss7fCM"
 
@@ -88,42 +91,31 @@ def send_message(chat_id, text):
         "parse_mode": "Markdown"
     })
 
-def app(environ, start_response):
-    method = environ.get("REQUEST_METHOD", "GET")
+@app.route("/webhook", methods=["GET"])
+def home():
+    return "FnO Bot is running! ✅", 200
 
-    if method == "GET":
-        response_body = b"FnO Bot is running! \xe2\x9c\x85"
-        status = "200 OK"
-        headers = [("Content-Type", "text/plain")]
-        start_response(status, headers)
-        return [response_body]
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    try:
+        update = request.get_json()
+        msg = update.get("message", {})
+        text = msg.get("text", "").strip().lower()
+        chat_id = msg.get("chat", {}).get("id")
 
-    if method == "POST":
-        try:
-            content_length = int(environ.get("CONTENT_LENGTH", 0))
-            body = environ["wsgi.input"].read(content_length)
-            update = json.loads(body)
+        if text == "/start":
+            send_message(chat_id,
+                "👋 *FnO Alert Bot*\n\n"
+                "Commands:\n"
+                "📊 /fno — Get top 5 FnO gainers & losers instantly\n"
+                "⏰ Auto alert every weekday at 9:25 AM IST"
+            )
+        elif text == "/fno":
+            send_message(chat_id, "⏳ Fetching FnO data, please wait...")
+            gainers, losers = get_fno_movers()
+            send_message(chat_id, build_message(gainers, losers))
 
-            msg = update.get("message", {})
-            text = msg.get("text", "").strip().lower()
-            chat_id = msg.get("chat", {}).get("id")
+    except Exception as e:
+        print(f"Error: {e}")
 
-            if text == "/start":
-                send_message(chat_id,
-                    "👋 *FnO Alert Bot*\n\n"
-                    "Commands:\n"
-                    "📊 /fno — Get top 5 FnO gainers & losers instantly\n"
-                    "⏰ Auto alert every weekday at 9:25 AM IST"
-                )
-            elif text == "/fno":
-                send_message(chat_id, "⏳ Fetching FnO data, please wait...")
-                gainers, losers = get_fno_movers()
-                send_message(chat_id, build_message(gainers, losers))
-
-        except Exception as e:
-            print(f"Error: {e}")
-
-        status = "200 OK"
-        headers = [("Content-Type", "application/json")]
-        start_response(status, headers)
-        return [b'{"ok": true}']
+    return jsonify({"ok": True})

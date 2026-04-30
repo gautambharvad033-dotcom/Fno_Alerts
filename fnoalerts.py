@@ -1,8 +1,8 @@
 import requests
 import datetime
+import json
 
 BOT_TOKEN = "8613392574:AAF83_86w1TGHdYuZF5ZXjwQPJQD8ss7fCM"
-CHAT_ID = "7084342720"
 
 FNO_SYMBOLS = [
     "ETERNAL", "RELIANCE", "BANDHANBNK", "MAZDOCK", "VEDL", "HDFCBANK",
@@ -82,12 +82,36 @@ def build_message(gainers, losers):
 
 def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
+    requests.post(url, data={
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown"
+    })
 
-if __name__ == "__main__":
-    if datetime.datetime.today().weekday() < 5:
-        gainers, losers = get_fno_movers()
-        send_message(CHAT_ID, build_message(gainers, losers))
-        print("Done!")
-    else:
-        print("Weekend — skipping.")
+def handler(request):
+    if request.method == "GET":
+        return Response("FnO Bot is running! ✅")
+
+    if request.method == "POST":
+        try:
+            update = request.json()
+            msg = update.get("message", {})
+            text = msg.get("text", "").strip().lower()
+            chat_id = msg.get("chat", {}).get("id")
+
+            if text == "/start":
+                send_message(chat_id,
+                    "👋 *FnO Alert Bot*\n\n"
+                    "Commands:\n"
+                    "📊 /fno — Get top 5 FnO gainers & losers instantly\n"
+                    "⏰ Auto alert every weekday at 9:25 AM IST"
+                )
+            elif text == "/fno":
+                send_message(chat_id, "⏳ Fetching FnO data, please wait...")
+                gainers, losers = get_fno_movers()
+                send_message(chat_id, build_message(gainers, losers))
+
+        except Exception as e:
+            print(f"Error: {e}")
+
+        return Response('{"ok": true}', content_type="application/json")

@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 import requests
 import datetime
-import json
 
 app = Flask(__name__)
 
@@ -50,37 +49,59 @@ def get_fno_movers():
     session = requests.Session()
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        "Referer": "https://www.nseindia.com"
+        "Referer": "https://www.nseindia.com",
+        "Accept": "application/json"
     }
     session.get("https://www.nseindia.com", headers=headers, timeout=10)
     gainers, losers = [], []
-    for symbol in FNO_SYMBOLS:
-        try:
-            url = f"https://www.nseindia.com/api/quote-equity?symbol={symbol}"
-            r = session.get(url, headers={**headers, "Accept": "application/json"}, timeout=10)
-            data = r.json()
-            ltp = data["priceInfo"]["lastPrice"]
-            change_pct = data["priceInfo"]["pChange"]
-            if 0 < change_pct < 3:
-                gainers.append((symbol, ltp, change_pct))
-            elif -3 < change_pct < 0:
-                losers.append((symbol, ltp, change_pct))
-        except:
-            continue
+    try:
+        url = "https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
+        r = session.get(url, headers=headers, timeout=10)
+        data = r.json()
+        stocks = data.get("data", [])
+        for stock in stocks:
+            try:
+                symbol = stock.get("symbol", "")
+                ltp = stock.get("lastPrice", 0)
+                change_pct = stock.get("pChange", 0)
+                if symbol and symbol in FNO_SYMBOLS:
+                    if 0 < change_pct < 3:
+                        gainers.append((symbol, ltp, change_pct))
+                    elif -3 < change_pct < 0:
+                        losers.append((symbol, ltp, change_pct))
+            except:
+                continue
+    except Exception as e:
+        print(f"API error: {e}")
     gainers.sort(key=lambda x: x[2], reverse=True)
     losers.sort(key=lambda x: x[2])
-    return gainers[:5], losers[:5]
+    return gainers[:10], losers[:10]
 
 def build_message(gainers, losers):
     IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
     now = datetime.datetime.now(IST).strftime("%d %b %Y, %I:%M %p")
-    g_lines = "\n".join([f"  {s}: ₹{l} (+{c:.2f}%)" for s, l, c in gainers]) or "  None"
-    l_lines = "\n".join([f"  {s}: ₹{l} ({c:.2f}%)" for s, l, c in losers]) or "  None"
+
+    g_lines = ""
+    for i, (s, l, c) in enumerate(gainers, 1):
+        g_lines += f"  {i}. {s}\n     ₹{l}  |  +{c:.2f}%  📈\n"
+
+    l_lines = ""
+    for i, (s, l, c) in enumerate(losers, 1):
+        l_lines += f"  {i}. {s}\n     ₹{l}  |  {c:.2f}%  📉\n"
+
     return (
-        f"📊 *FnO Top 5 Movers — {now} IST*\n"
-        f"_(Stocks with 0–3% move only)_\n\n"
-        f"✅ *Top 5 Gainers:*\n{g_lines}\n\n"
-        f"🔴 *Top 5 Losers:*\n{l_lines}"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 *FnO Top 10 Movers*\n"
+        f"🕐 {now} IST\n"
+        f"_(0% to 3% move only)_\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"✅ *TOP 10 GAINERS*\n"
+        f"───────────────────\n"
+        f"{g_lines or '  None'}\n"
+        f"🔴 *TOP 10 LOSERS*\n"
+        f"───────────────────\n"
+        f"{l_lines or '  None'}\n"
+        f"━━━━━━━━━━━━━━━━━━━"
     )
 
 def send_message(chat_id, text):
@@ -97,17 +118,21 @@ def home():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    update = request.get_json(silent=True) or {}
+
     try:
-        update = request.get_json()
         msg = update.get("message", {})
         text = msg.get("text", "").strip().lower()
         chat_id = msg.get("chat", {}).get("id")
+
+        if not chat_id:
+            return jsonify({"ok": True})
 
         if text == "/start":
             send_message(chat_id,
                 "👋 *FnO Alert Bot*\n\n"
                 "Commands:\n"
-                "📊 /fno — Get top 5 FnO gainers & losers instantly\n"
+                "📊 /fno — Get top 10 FnO gainers & losers instantly\n"
                 "⏰ Auto alert every weekday at 9:25 AM IST"
             )
         elif text == "/fno":

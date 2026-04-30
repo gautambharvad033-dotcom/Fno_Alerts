@@ -81,13 +81,20 @@ def build_message(gainers, losers):
     IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
     now = datetime.datetime.now(IST).strftime("%d %b %Y, %I:%M %p")
 
-    g_lines = ""
-    for i, (s, l, c) in enumerate(gainers, 1):
-        g_lines += f"  {i}. {s}\n     ₹{l}  |  +{c:.2f}%  📈\n"
+    def make_table(stocks, is_gainer):
+        lines = "`#   SYMBOL         LTP        CHG%`\n"
+        lines += "`────────────────────────────────`\n"
+        for i, (s, l, c) in enumerate(stocks, 1):
+            num = str(i).ljust(2)
+            symbol = s[:12].ljust(12)
+            price = f"₹{l}".ljust(10)
+            sign = "+" if is_gainer else ""
+            chg = f"{sign}{c:.2f}%"
+            lines += f"`{num}  {symbol}  {price}  {chg}`\n"
+        return lines if stocks else "`  None`\n"
 
-    l_lines = ""
-    for i, (s, l, c) in enumerate(losers, 1):
-        l_lines += f"  {i}. {s}\n     ₹{l}  |  {c:.2f}%  📉\n"
+    g_table = make_table(gainers, True)
+    l_table = make_table(losers, False)
 
     return (
         f"━━━━━━━━━━━━━━━━━━━\n"
@@ -95,12 +102,10 @@ def build_message(gainers, losers):
         f"🕐 {now} IST\n"
         f"_(0% to 3% move only)_\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
-        f"✅ *TOP 10 GAINERS*\n"
-        f"───────────────────\n"
-        f"{g_lines or '  None'}\n"
-        f"🔴 *TOP 10 LOSERS*\n"
-        f"───────────────────\n"
-        f"{l_lines or '  None'}\n"
+        f"✅ *TOP 10 GAINERS* 📈\n"
+        f"{g_table}\n"
+        f"🔴 *TOP 10 LOSERS* 📉\n"
+        f"{l_table}\n"
         f"━━━━━━━━━━━━━━━━━━━"
     )
 

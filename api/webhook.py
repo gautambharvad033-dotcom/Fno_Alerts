@@ -88,13 +88,22 @@ def send_message(chat_id, text):
         "parse_mode": "Markdown"
     })
 
-def handler(request):
-    if request.method == "GET":
-        return Response("FnO Bot is running! ✅")
+def app(environ, start_response):
+    method = environ.get("REQUEST_METHOD", "GET")
 
-    if request.method == "POST":
+    if method == "GET":
+        response_body = b"FnO Bot is running! \xe2\x9c\x85"
+        status = "200 OK"
+        headers = [("Content-Type", "text/plain")]
+        start_response(status, headers)
+        return [response_body]
+
+    if method == "POST":
         try:
-            update = request.json()
+            content_length = int(environ.get("CONTENT_LENGTH", 0))
+            body = environ["wsgi.input"].read(content_length)
+            update = json.loads(body)
+
             msg = update.get("message", {})
             text = msg.get("text", "").strip().lower()
             chat_id = msg.get("chat", {}).get("id")
@@ -114,4 +123,7 @@ def handler(request):
         except Exception as e:
             print(f"Error: {e}")
 
-        return Response('{"ok": true}', content_type="application/json")
+        status = "200 OK"
+        headers = [("Content-Type", "application/json")]
+        start_response(status, headers)
+        return [b'{"ok": true}']

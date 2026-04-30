@@ -1,7 +1,7 @@
+from http.server import BaseHTTPRequestHandler
 import requests
 import datetime
 import json
-from http.server import BaseHTTPRequestHandler
 
 BOT_TOKEN = "8613392574:AAF83_86w1TGHdYuZF5ZXjwQPJQD8ss7fCM"
 
@@ -83,34 +83,46 @@ def build_message(gainers, losers):
 
 def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
+    requests.post(url, data={
+        "chat_id": chat_id,
+        "text": text,
+        "parse_mode": "Markdown"
+    })
 
 class handler(BaseHTTPRequestHandler):
+
     def do_POST(self):
-        content_length = int(self.headers['Content-Length'])
-        body = self.rfile.read(content_length)
-        update = json.loads(body)
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length)
+            update = json.loads(body)
 
-        msg = update.get("message", {})
-        text = msg.get("text", "").strip().lower()
-        chat_id = msg.get("chat", {}).get("id")
+            msg = update.get("message", {})
+            text = msg.get("text", "").strip().lower()
+            chat_id = msg.get("chat", {}).get("id")
 
-        if text == "/start":
-            send_message(chat_id,
-                "👋 *FnO Alert Bot*\n\n"
-                "Commands:\n"
-                "📊 /fno — Get top 5 FnO gainers & losers\n"
-                "⏰ Auto alert every weekday at 9:25 AM IST"
-            )
-        elif text == "/fno":
-            send_message(chat_id, "⏳ Fetching FnO data, please wait...")
-            gainers, losers = get_fno_movers()
-            send_message(chat_id, build_message(gainers, losers))
+            if text == "/start":
+                send_message(chat_id,
+                    "👋 *FnO Alert Bot*\n\n"
+                    "Commands:\n"
+                    "📊 /fno — Get top 5 FnO gainers & losers instantly\n"
+                    "⏰ Auto alert every weekday at 9:25 AM IST"
+                )
+            elif text == "/fno":
+                send_message(chat_id, "⏳ Fetching FnO data, please wait...")
+                gainers, losers = get_fno_movers()
+                send_message(chat_id, build_message(gainers, losers))
+
+        except Exception as e:
+            print(f"Error: {e}")
 
         self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
         self.end_headers()
+        self.wfile.write(b'{"ok": true}')
 
     def do_GET(self):
         self.send_response(200)
+        self.send_header('Content-Type', 'text/plain')
         self.end_headers()
         self.wfile.write(b"FnO Bot is running!")

@@ -1,4 +1,3 @@
-from http.server import BaseHTTPRequestHandler
 import requests
 import datetime
 import json
@@ -89,14 +88,13 @@ def send_message(chat_id, text):
         "parse_mode": "Markdown"
     })
 
-class handler(BaseHTTPRequestHandler):
+def handler(request):
+    if request.method == "GET":
+        return Response("FnO Bot is running! ✅")
 
-    def do_POST(self):
+    if request.method == "POST":
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length)
-            update = json.loads(body)
-
+            update = request.json()
             msg = update.get("message", {})
             text = msg.get("text", "").strip().lower()
             chat_id = msg.get("chat", {}).get("id")
@@ -116,13 +114,4 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"Error: {e}")
 
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.end_headers()
-        self.wfile.write(b'{"ok": true}')
-
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/plain')
-        self.end_headers()
-        self.wfile.write(b"FnO Bot is running!")
+        return Response('{"ok": true}', content_type="application/json")

@@ -57,6 +57,7 @@ FNO_SYMBOLS = [
 
 _security_id_cache = {}
 
+
 def get_security_ids():
     global _security_id_cache
     if _security_id_cache:
@@ -80,6 +81,7 @@ def get_security_ids():
     except Exception as e:
         print(f"Error loading security master: {e}")
     return _security_id_cache
+
 
 def parse_input(text):
     IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
@@ -109,6 +111,7 @@ def parse_input(text):
                 continue
     return date_obj, time_obj
 
+
 def get_price_at_time(symbol, sec_id, date_obj, time_obj):
     try:
         date_str = date_obj.strftime("%Y-%m-%d")
@@ -123,12 +126,15 @@ def get_price_at_time(symbol, sec_id, date_obj, time_obj):
         }
         r = requests.post(url, json=payload, headers=DHAN_HEADERS, timeout=10)
         data = r.json()
+
         timestamps = data.get("data", {}).get("timestamp", [])
         closes = data.get("data", {}).get("close", [])
         opens_list = data.get("data", {}).get("open", [])
-       if not timestamps or not closes:
+
+        if not timestamps or not closes:
             print(f"Empty data for {symbol}: {data}")
             return None, None
+
         target_seconds = time_obj.hour * 3600 + time_obj.minute * 60
         best_idx = 0
         best_diff = float("inf")
@@ -139,6 +145,7 @@ def get_price_at_time(symbol, sec_id, date_obj, time_obj):
             if diff < best_diff:
                 best_diff = diff
                 best_idx = i
+
         prev_url = "https://api.dhan.co/v2/charts/historical"
         prev_date = (date_obj - datetime.timedelta(days=5)).strftime("%Y-%m-%d")
         prev_payload = {
@@ -162,6 +169,7 @@ def get_price_at_time(symbol, sec_id, date_obj, time_obj):
         print(f"Error {symbol}: {e}")
         return None, None
 
+
 def get_movers_at_time(date_obj, time_obj):
     security_ids = get_security_ids()
     gainers, losers = [], []
@@ -179,6 +187,7 @@ def get_movers_at_time(date_obj, time_obj):
     gainers.sort(key=lambda x: x[2], reverse=True)
     losers.sort(key=lambda x: x[2])
     return gainers[:10], losers[:10]
+
 
 def get_live_movers():
     session = requests.Session()
@@ -212,6 +221,7 @@ def get_live_movers():
     losers.sort(key=lambda x: x[2])
     return gainers[:10], losers[:10]
 
+
 def build_message(gainers, losers, date_label, time_label=None):
     time_str = f" at {time_label}" if time_label else ""
 
@@ -221,7 +231,7 @@ def build_message(gainers, losers, date_label, time_label=None):
         for i, (s, l, c) in enumerate(stocks, 1):
             num = str(i).ljust(2)
             symbol = s[:12].ljust(12)
-            price = f"₹{l}".ljust(10)
+            price = f"Rs{l}".ljust(10)
             sign = "+" if is_gainer else ""
             chg = f"{sign}{c:.2f}%"
             lines += f"`{num}  {symbol}  {price}  {chg}`\n"
@@ -243,6 +253,7 @@ def build_message(gainers, losers, date_label, time_label=None):
         f"━━━━━━━━━━━━━━━━━━━"
     )
 
+
 def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     requests.post(url, data={
@@ -251,9 +262,11 @@ def send_message(chat_id, text):
         "parse_mode": "Markdown"
     })
 
+
 @app.route("/webhook", methods=["GET"])
 def home():
     return "FnO Bot is running! ✅", 200
+
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
@@ -271,7 +284,7 @@ def webhook():
         if text_lower == "/test":
             security_ids = get_security_ids()
             reliance_id = security_ids.get("RELIANCE", "NOT FOUND")
-            send_message(chat_id, f"✅ Security IDs loaded: {len(security_ids)}\nRELIANCE ID: `{reliance_id}`")
+            send_message(chat_id, f"Security IDs loaded: {len(security_ids)}\nRELIANCE ID: `{reliance_id}`")
             if reliance_id != "NOT FOUND":
                 date_obj = datetime.datetime(2026, 4, 29)
                 time_obj = datetime.time(9, 25)
@@ -282,10 +295,10 @@ def webhook():
             send_message(chat_id,
                 "👋 *FnO Alert Bot*\n\n"
                 "*Commands:*\n"
-                "📊 `/fno` — Today's live top 10\n"
-                "📅 `/fno 29-Apr` — Any date EOD\n"
-                "⏰ `/fno 29-Apr 9:25` — Any date at time\n"
-                "⏰ `/fno 15-04-2026 14:30` — Full date & time\n\n"
+                "📊 `/fno` - Today's live top 10\n"
+                "📅 `/fno 29-Apr` - Any date EOD\n"
+                "⏰ `/fno 29-Apr 9:25` - Any date at time\n"
+                "⏰ `/fno 15-04-2026 14:30` - Full date and time\n\n"
                 "⏰ Auto alert every weekday at 9:25 AM IST"
             )
 

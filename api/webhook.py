@@ -290,17 +290,19 @@ def webhook():
         if not chat_id:
             return jsonify({"ok": True})
 
-        if text_lower == "/start":
-            send_message(chat_id,
-                "👋 *FnO Alert Bot*\n\n"
-                "*Commands:*\n"
-                "📊 `/fno` — Today's live top 10\n"
-                "📅 `/fno 29-Apr` — Any date EOD\n"
-                "⏰ `/fno 29-Apr 9:25` — Any date at time\n"
-                "⏰ `/fno 15-04-2026 14:30` — Full date & time\n\n"
-                "⏰ Auto alert every weekday at 9:25 AM IST"
-            )
-
+     if text_lower == "/test":
+            # Test Dhan API with one stock
+            security_ids = get_security_ids()
+            reliance_id = security_ids.get("RELIANCE", "NOT FOUND")
+            send_message(chat_id, f"Security IDs loaded: {len(security_ids)}\nRELIANCE ID: {reliance_id}")
+            
+            # Test intraday data
+            if reliance_id != "NOT FOUND":
+                date_obj = datetime.datetime(2026, 4, 29)
+                time_obj = datetime.time(9, 25)
+                ltp, chg = get_price_at_time("RELIANCE", reliance_id, date_obj, time_obj)
+                send_message(chat_id, f"RELIANCE on 29-Apr at 9:25 AM:\nLTP: {ltp}\nChange: {chg}")
+            return jsonify({"ok": True})
         elif text_lower.startswith("/fno"):
             parts = full_text.split(maxsplit=1)
             args = parts[1].strip() if len(parts) > 1 else ""

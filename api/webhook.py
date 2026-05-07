@@ -1,12 +1,20 @@
 from flask import Flask, request, jsonify
 import requests
 import datetime
+import csv
+import io
 
 app = Flask(__name__)
 
 BOT_TOKEN = "8613392574:AAF83_86w1TGHdYuZF5ZXjwQPJQD8ss7fCM"
 DHAN_ACCESS_TOKEN = "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbkNvbnN1bWVyVHlwZSI6IlNFTEYiLCJwYXJ0bmVySWQiOiIiLCJkaGFuQ2xpZW50SWQiOiIyNjA1MDc5ODg1Iiwid2ViaG9va1VybCI6IiIsImlzcyI6ImRoYW4iLCJleHAiOjE3ODA3MjMyODh9.HYPv4UfnDeD-1cXNVemh0McAIXi07zCwH0utQMi1CAu5PqAuFmcJownph0AGL1k1OcAvF3ukGUgm-_fP5chtPw"
 DHAN_CLIENT_ID = "2605079885"
+
+DHAN_HEADERS = {
+    "access-token": DHAN_ACCESS_TOKEN,
+    "client-id": DHAN_CLIENT_ID,
+    "Content-Type": "application/json"
+}
 
 FNO_SYMBOLS = [
     "ETERNAL", "RELIANCE", "BANDHANBNK", "MAZDOCK", "VEDL", "HDFCBANK",
@@ -47,20 +55,38 @@ FNO_SYMBOLS = [
     "NUVAMA"
 ]
 
-DHAN_HEADERS = {
-    "access-token": DHAN_ACCESS_TOKEN,
-    "client-id": DHAN_CLIENT_ID,
-    "Content-Type": "application/json"
-}
+# Cache for security IDs
+_security_id_cache = {}
+
+def get_security_ids():
+    """Download Dhan security master and build symbol->ID map"""
+    global _security_id_cache
+    if _security_id_cache:
+        return _security_id_cache
+
+    try:
+        url = "https://images.dhan.co/api-data/api-scrip-master.csv"
+        r = requests.get(url, timeout=15)
+        content = r.content.decode("utf-8")
+        reader = csv.DictReader(io.StringIO(content))
+        for row in reader:
+            try:
+                symbol = row.get("SEM_TRADING_SYMBOL", "").strip()
+                seg = row.get("SEM_EXM_EXCH_ID", "").strip()
+                sec_id = row.get("SEM_SMST_SECURITY_ID", "").strip()
+                inst = row.get("SEM_INSTRUMENT_NAME", "").strip()
+                if seg == "NSE" and inst == "EQUITY" and symbol and sec_id:
+                    _security_id_cache[symbol] = sec_id
+            except:
+                continue
+        print(f"Loaded {len(_security_id_cache)} security IDs")
+    except Exception as e:
+        print(f"Error loading security master: {e}")
+
+    return _security_id_cache
 
 def parse_input(text):
-    """
-    Parse command like:
-    /fno → today, live
-    /fno 29-Apr → that date, EOD
-    /fno 29-Apr 9:25 → that date at 9:25 AM
-    /fno 15-04-2026 9:25 → full date at time
-    """
+    """Parse date and time from user input"""
     IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
     today = datetime.datetime.now(IST)
     date_obj = today
@@ -68,7 +94,6 @@ def parse_input(text):
 
     parts = text.strip().split()
 
-    # Try to parse date
     if len(parts) >= 1:
         date_str = parts[0]
         for fmt in ["%d-%m-%Y", "%d-%b-%Y", "%d-%b", "%Y-%m-%d"]:
@@ -81,28 +106,25 @@ def parse_input(text):
             except:
                 continue
 
-    # Try to parse time
     if len(parts) >= 2:
         time_str = parts[1]
-        try:
-            t = datetime.datetime.strptime(time_str, "%H:%M")
-            time_obj = t.time()
-        except:
+        for fmt in ["%H:%M", "%I:%M"]:
             try:
-                t = datetime.datetime.strptime(time_str, "%I:%M")
+                t = datetime.datetime.strptime(time_str, fmt)
                 time_obj = t.time()
+                break
             except:
-                pass
+                continue
 
     return date_obj, time_obj
 
-def get_price_at_time(symbol, date_obj, time_obj):
+def get_price_at_time(symbol, sec_id, date_obj, time_obj):
     """Get stock price at specific time using Dhan intraday API"""
     try:
         date_str = date_obj.strftime("%Y-%m-%d")
         url = "https://api.dhan.co/v2/charts/intraday"
         payload = {
-            "securityId": symbol,
+            "securityId": sec_id,
             "exchangeSegment": "NSE_EQ",
             "instrument": "EQUITY",
             "interval": "1",
@@ -117,11 +139,9 @@ def get_price_at_time(symbol, date_obj, time_obj):
         opens_list = data.get("data", {}).get("open", [])
 
         if not timestamps or not closes:
-            return None, None, None
+            return None, None
 
-        # Find candle closest to requested time
         target_seconds = time_obj.hour * 3600 + time_obj.minute * 60
-
         best_idx = 0
         best_diff = float("inf")
         for i, ts in enumerate(timestamps):
@@ -132,11 +152,11 @@ def get_price_at_time(symbol, date_obj, time_obj):
                 best_diff = diff
                 best_idx = i
 
-        # Get prev day close for % change calculation
-        prev_close_url = "https://api.dhan.co/v2/charts/historical"
+        # Get prev close
+        prev_url = "https://api.dhan.co/v2/charts/historical"
         prev_date = (date_obj - datetime.timedelta(days=5)).strftime("%Y-%m-%d")
         prev_payload = {
-            "securityId": symbol,
+            "securityId": sec_id,
             "exchangeSegment": "NSE_EQ",
             "instrument": "EQUITY",
             "expiryCode": 0,
@@ -145,29 +165,31 @@ def get_price_at_time(symbol, date_obj, time_obj):
             "toDate": date_str,
             "interval": "1d"
         }
-        pr = requests.post(prev_close_url, json=prev_payload, headers=DHAN_HEADERS, timeout=10)
+        pr = requests.post(prev_url, json=prev_payload, headers=DHAN_HEADERS, timeout=10)
         prev_data = pr.json()
         prev_closes = prev_data.get("data", {}).get("close", [])
 
-        if len(prev_closes) >= 2:
-            prev_close = prev_closes[-2]
-        else:
-            prev_close = opens_list[0] if opens_list else closes[best_idx]
-
+        prev_close = prev_closes[-2] if len(prev_closes) >= 2 else (opens_list[0] if opens_list else closes[best_idx])
         ltp = closes[best_idx]
         change_pct = ((ltp - prev_close) / prev_close) * 100
-        return ltp, change_pct, datetime.datetime.fromtimestamp(timestamps[best_idx])
+        return ltp, change_pct
 
     except Exception as e:
         print(f"Error {symbol}: {e}")
-        return None, None, None
+        return None, None
 
 def get_movers_at_time(date_obj, time_obj):
     """Get FnO gainers/losers at specific date and time"""
+    security_ids = get_security_ids()
     gainers, losers = [], []
 
     for symbol in FNO_SYMBOLS:
-        ltp, change_pct, _ = get_price_at_time(symbol, date_obj, time_obj)
+        sec_id = security_ids.get(symbol)
+        if not sec_id:
+            print(f"No security ID for {symbol}")
+            continue
+
+        ltp, change_pct = get_price_at_time(symbol, sec_id, date_obj, time_obj)
         if ltp is None:
             continue
         if 0 < change_pct < 3:
@@ -213,9 +235,6 @@ def get_live_movers():
     return gainers[:10], losers[:10]
 
 def build_message(gainers, losers, date_label, time_label=None):
-    IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-    now = datetime.datetime.now(IST).strftime("%d %b %Y, %I:%M %p")
-
     time_str = f" at {time_label}" if time_label else ""
 
     def make_table(stocks, is_gainer):
@@ -276,10 +295,10 @@ def webhook():
                 "👋 *FnO Alert Bot*\n\n"
                 "*Commands:*\n"
                 "📊 `/fno` — Today's live top 10\n"
-                "📅 `/fno 29-Apr` — Any date EOD data\n"
-                "⏰ `/fno 29-Apr 9:25` — Any date at specific time\n"
+                "📅 `/fno 29-Apr` — Any date EOD\n"
+                "⏰ `/fno 29-Apr 9:25` — Any date at time\n"
                 "⏰ `/fno 15-04-2026 14:30` — Full date & time\n\n"
-                "Auto alert every weekday at 9:25 AM IST ⏰"
+                "⏰ Auto alert every weekday at 9:25 AM IST"
             )
 
         elif text_lower.startswith("/fno"):
@@ -287,30 +306,19 @@ def webhook():
             args = parts[1].strip() if len(parts) > 1 else ""
 
             if not args:
-                # Live data
-                send_message(chat_id, "⏳ Fetching live FnO data, please wait...")
+                send_message(chat_id, "⏳ Fetching live FnO data...")
                 gainers, losers = get_live_movers()
                 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
                 today = datetime.datetime.now(IST).strftime("%d %b %Y")
                 send_message(chat_id, build_message(gainers, losers, date_label=today))
-
             else:
-                # Parse date and optional time
                 date_obj, time_obj = parse_input(args)
                 date_label = date_obj.strftime("%d %b %Y")
-
-                if time_obj:
-                    # Historical data at specific time
-                    time_label = time_obj.strftime("%I:%M %p")
-                    send_message(chat_id, f"⏳ Fetching data for *{date_label}* at *{time_label}*, please wait...")
-                    gainers, losers = get_movers_at_time(date_obj, time_obj)
-                    send_message(chat_id, build_message(gainers, losers, date_label=date_label, time_label=time_label))
-
-                else:
-                    # Historical EOD data
-                    send_message(chat_id, f"⏳ Fetching data for *{date_label}*, please wait...")
-                    gainers, losers = get_movers_at_time(date_obj, datetime.time(15, 30))
-                    send_message(chat_id, build_message(gainers, losers, date_label=date_label, time_label="3:30 PM"))
+                time_obj = time_obj or datetime.time(15, 30)
+                time_label = time_obj.strftime("%I:%M %p")
+                send_message(chat_id, f"⏳ Fetching data for *{date_label}* at *{time_label}*...\n_This may take 1-2 minutes_")
+                gainers, losers = get_movers_at_time(date_obj, time_obj)
+                send_message(chat_id, build_message(gainers, losers, date_label=date_label, time_label=time_label))
 
     except Exception as e:
         print(f"Error: {e}")

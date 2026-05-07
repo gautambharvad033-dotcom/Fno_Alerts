@@ -5,6 +5,8 @@ import datetime
 app = Flask(__name__)
 
 BOT_TOKEN = "8613392574:AAF83_86w1TGHdYuZF5ZXjwQPJQD8ss7fCM"
+DHAN_ACCESS_TOKEN = "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbkNvbnN1bWVyVHlwZSI6IlNFTEYiLCJwYXJ0bmVySWQiOiIiLCJkaGFuQ2xpZW50SWQiOiIyNjA1MDc5ODg1Iiwid2ViaG9va1VybCI6IiIsImlzcyI6ImRoYW4iLCJleHAiOjE3ODA3MjMyODh9.HYPv4UfnDeD-1cXNVemh0McAIXi07zCwH0utQMi1CAu5PqAuFmcJownph0AGL1k1OcAvF3ukGUgm-_fP5chtPw"
+DHAN_CLIENT_ID = "2605079885"
 
 FNO_SYMBOLS = [
     "ETERNAL", "RELIANCE", "BANDHANBNK", "MAZDOCK", "VEDL", "HDFCBANK",
@@ -45,7 +47,140 @@ FNO_SYMBOLS = [
     "NUVAMA"
 ]
 
-def get_fno_movers():
+DHAN_HEADERS = {
+    "access-token": DHAN_ACCESS_TOKEN,
+    "client-id": DHAN_CLIENT_ID,
+    "Content-Type": "application/json"
+}
+
+def parse_input(text):
+    """
+    Parse command like:
+    /fno → today, live
+    /fno 29-Apr → that date, EOD
+    /fno 29-Apr 9:25 → that date at 9:25 AM
+    /fno 15-04-2026 9:25 → full date at time
+    """
+    IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+    today = datetime.datetime.now(IST)
+    date_obj = today
+    time_obj = None
+
+    parts = text.strip().split()
+
+    # Try to parse date
+    if len(parts) >= 1:
+        date_str = parts[0]
+        for fmt in ["%d-%m-%Y", "%d-%b-%Y", "%d-%b", "%Y-%m-%d"]:
+            try:
+                dt = datetime.datetime.strptime(date_str, fmt)
+                if fmt == "%d-%b":
+                    dt = dt.replace(year=today.year)
+                date_obj = dt
+                break
+            except:
+                continue
+
+    # Try to parse time
+    if len(parts) >= 2:
+        time_str = parts[1]
+        try:
+            t = datetime.datetime.strptime(time_str, "%H:%M")
+            time_obj = t.time()
+        except:
+            try:
+                t = datetime.datetime.strptime(time_str, "%I:%M")
+                time_obj = t.time()
+            except:
+                pass
+
+    return date_obj, time_obj
+
+def get_price_at_time(symbol, date_obj, time_obj):
+    """Get stock price at specific time using Dhan intraday API"""
+    try:
+        date_str = date_obj.strftime("%Y-%m-%d")
+        url = "https://api.dhan.co/v2/charts/intraday"
+        payload = {
+            "securityId": symbol,
+            "exchangeSegment": "NSE_EQ",
+            "instrument": "EQUITY",
+            "interval": "1",
+            "fromDate": date_str,
+            "toDate": date_str
+        }
+        r = requests.post(url, json=payload, headers=DHAN_HEADERS, timeout=10)
+        data = r.json()
+
+        timestamps = data.get("data", {}).get("timestamp", [])
+        closes = data.get("data", {}).get("close", [])
+        opens_list = data.get("data", {}).get("open", [])
+
+        if not timestamps or not closes:
+            return None, None, None
+
+        # Find candle closest to requested time
+        target_seconds = time_obj.hour * 3600 + time_obj.minute * 60
+
+        best_idx = 0
+        best_diff = float("inf")
+        for i, ts in enumerate(timestamps):
+            dt = datetime.datetime.fromtimestamp(ts)
+            candle_seconds = dt.hour * 3600 + dt.minute * 60
+            diff = abs(candle_seconds - target_seconds)
+            if diff < best_diff:
+                best_diff = diff
+                best_idx = i
+
+        # Get prev day close for % change calculation
+        prev_close_url = "https://api.dhan.co/v2/charts/historical"
+        prev_date = (date_obj - datetime.timedelta(days=5)).strftime("%Y-%m-%d")
+        prev_payload = {
+            "securityId": symbol,
+            "exchangeSegment": "NSE_EQ",
+            "instrument": "EQUITY",
+            "expiryCode": 0,
+            "oi": False,
+            "fromDate": prev_date,
+            "toDate": date_str,
+            "interval": "1d"
+        }
+        pr = requests.post(prev_close_url, json=prev_payload, headers=DHAN_HEADERS, timeout=10)
+        prev_data = pr.json()
+        prev_closes = prev_data.get("data", {}).get("close", [])
+
+        if len(prev_closes) >= 2:
+            prev_close = prev_closes[-2]
+        else:
+            prev_close = opens_list[0] if opens_list else closes[best_idx]
+
+        ltp = closes[best_idx]
+        change_pct = ((ltp - prev_close) / prev_close) * 100
+        return ltp, change_pct, datetime.datetime.fromtimestamp(timestamps[best_idx])
+
+    except Exception as e:
+        print(f"Error {symbol}: {e}")
+        return None, None, None
+
+def get_movers_at_time(date_obj, time_obj):
+    """Get FnO gainers/losers at specific date and time"""
+    gainers, losers = [], []
+
+    for symbol in FNO_SYMBOLS:
+        ltp, change_pct, _ = get_price_at_time(symbol, date_obj, time_obj)
+        if ltp is None:
+            continue
+        if 0 < change_pct < 3:
+            gainers.append((symbol, ltp, change_pct))
+        elif -3 < change_pct < 0:
+            losers.append((symbol, ltp, change_pct))
+
+    gainers.sort(key=lambda x: x[2], reverse=True)
+    losers.sort(key=lambda x: x[2])
+    return gainers[:10], losers[:10]
+
+def get_live_movers():
+    """Get live FnO movers using NSE API"""
     session = requests.Session()
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -77,9 +212,11 @@ def get_fno_movers():
     losers.sort(key=lambda x: x[2])
     return gainers[:10], losers[:10]
 
-def build_message(gainers, losers):
+def build_message(gainers, losers, date_label, time_label=None):
     IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
     now = datetime.datetime.now(IST).strftime("%d %b %Y, %I:%M %p")
+
+    time_str = f" at {time_label}" if time_label else ""
 
     def make_table(stocks, is_gainer):
         lines = "`#   SYMBOL         LTP        CHG%`\n"
@@ -99,7 +236,7 @@ def build_message(gainers, losers):
     return (
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"📊 *FnO Top 10 Movers*\n"
-        f"🕐 {now} IST\n"
+        f"📅 {date_label}{time_str}\n"
         f"_(0% to 3% move only)_\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
         f"✅ *TOP 10 GAINERS* 📈\n"
@@ -127,25 +264,56 @@ def webhook():
 
     try:
         msg = update.get("message", {})
-        text = msg.get("text", "").strip().lower()
+        full_text = msg.get("text", "").strip()
+        text_lower = full_text.lower()
         chat_id = msg.get("chat", {}).get("id")
 
         if not chat_id:
             return jsonify({"ok": True})
 
-        if text == "/start":
+        if text_lower == "/start":
             send_message(chat_id,
                 "👋 *FnO Alert Bot*\n\n"
-                "Commands:\n"
-                "📊 /fno — Get top 10 FnO gainers & losers instantly\n"
-                "⏰ Auto alert every weekday at 9:25 AM IST"
+                "*Commands:*\n"
+                "📊 `/fno` — Today's live top 10\n"
+                "📅 `/fno 29-Apr` — Any date EOD data\n"
+                "⏰ `/fno 29-Apr 9:25` — Any date at specific time\n"
+                "⏰ `/fno 15-04-2026 14:30` — Full date & time\n\n"
+                "Auto alert every weekday at 9:25 AM IST ⏰"
             )
-        elif text == "/fno":
-            send_message(chat_id, "⏳ Fetching FnO data, please wait...")
-            gainers, losers = get_fno_movers()
-            send_message(chat_id, build_message(gainers, losers))
+
+        elif text_lower.startswith("/fno"):
+            parts = full_text.split(maxsplit=1)
+            args = parts[1].strip() if len(parts) > 1 else ""
+
+            if not args:
+                # Live data
+                send_message(chat_id, "⏳ Fetching live FnO data, please wait...")
+                gainers, losers = get_live_movers()
+                IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+                today = datetime.datetime.now(IST).strftime("%d %b %Y")
+                send_message(chat_id, build_message(gainers, losers, date_label=today))
+
+            else:
+                # Parse date and optional time
+                date_obj, time_obj = parse_input(args)
+                date_label = date_obj.strftime("%d %b %Y")
+
+                if time_obj:
+                    # Historical data at specific time
+                    time_label = time_obj.strftime("%I:%M %p")
+                    send_message(chat_id, f"⏳ Fetching data for *{date_label}* at *{time_label}*, please wait...")
+                    gainers, losers = get_movers_at_time(date_obj, time_obj)
+                    send_message(chat_id, build_message(gainers, losers, date_label=date_label, time_label=time_label))
+
+                else:
+                    # Historical EOD data
+                    send_message(chat_id, f"⏳ Fetching data for *{date_label}*, please wait...")
+                    gainers, losers = get_movers_at_time(date_obj, datetime.time(15, 30))
+                    send_message(chat_id, build_message(gainers, losers, date_label=date_label, time_label="3:30 PM"))
 
     except Exception as e:
         print(f"Error: {e}")
+        send_message(chat_id, "❌ Something went wrong. Please try again!")
 
     return jsonify({"ok": True})

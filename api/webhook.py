@@ -55,15 +55,12 @@ FNO_SYMBOLS = [
     "NUVAMA"
 ]
 
-# Cache for security IDs
 _security_id_cache = {}
 
 def get_security_ids():
-    """Download Dhan security master and build symbol->ID map"""
     global _security_id_cache
     if _security_id_cache:
         return _security_id_cache
-
     try:
         url = "https://images.dhan.co/api-data/api-scrip-master.csv"
         r = requests.get(url, timeout=15)
@@ -82,18 +79,14 @@ def get_security_ids():
         print(f"Loaded {len(_security_id_cache)} security IDs")
     except Exception as e:
         print(f"Error loading security master: {e}")
-
     return _security_id_cache
 
 def parse_input(text):
-    """Parse date and time from user input"""
     IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
     today = datetime.datetime.now(IST)
     date_obj = today
     time_obj = None
-
     parts = text.strip().split()
-
     if len(parts) >= 1:
         date_str = parts[0]
         for fmt in ["%d-%m-%Y", "%d-%b-%Y", "%d-%b", "%Y-%m-%d"]:
@@ -105,7 +98,6 @@ def parse_input(text):
                 break
             except:
                 continue
-
     if len(parts) >= 2:
         time_str = parts[1]
         for fmt in ["%H:%M", "%I:%M"]:
@@ -115,11 +107,9 @@ def parse_input(text):
                 break
             except:
                 continue
-
     return date_obj, time_obj
 
 def get_price_at_time(symbol, sec_id, date_obj, time_obj):
-    """Get stock price at specific time using Dhan intraday API"""
     try:
         date_str = date_obj.strftime("%Y-%m-%d")
         url = "https://api.dhan.co/v2/charts/intraday"
@@ -133,14 +123,11 @@ def get_price_at_time(symbol, sec_id, date_obj, time_obj):
         }
         r = requests.post(url, json=payload, headers=DHAN_HEADERS, timeout=10)
         data = r.json()
-
         timestamps = data.get("data", {}).get("timestamp", [])
         closes = data.get("data", {}).get("close", [])
         opens_list = data.get("data", {}).get("open", [])
-
         if not timestamps or not closes:
             return None, None
-
         target_seconds = time_obj.hour * 3600 + time_obj.minute * 60
         best_idx = 0
         best_diff = float("inf")
@@ -151,8 +138,6 @@ def get_price_at_time(symbol, sec_id, date_obj, time_obj):
             if diff < best_diff:
                 best_diff = diff
                 best_idx = i
-
-        # Get prev close
         prev_url = "https://api.dhan.co/v2/charts/historical"
         prev_date = (date_obj - datetime.timedelta(days=5)).strftime("%Y-%m-%d")
         prev_payload = {
@@ -168,27 +153,21 @@ def get_price_at_time(symbol, sec_id, date_obj, time_obj):
         pr = requests.post(prev_url, json=prev_payload, headers=DHAN_HEADERS, timeout=10)
         prev_data = pr.json()
         prev_closes = prev_data.get("data", {}).get("close", [])
-
         prev_close = prev_closes[-2] if len(prev_closes) >= 2 else (opens_list[0] if opens_list else closes[best_idx])
         ltp = closes[best_idx]
         change_pct = ((ltp - prev_close) / prev_close) * 100
         return ltp, change_pct
-
     except Exception as e:
         print(f"Error {symbol}: {e}")
         return None, None
 
 def get_movers_at_time(date_obj, time_obj):
-    """Get FnO gainers/losers at specific date and time"""
     security_ids = get_security_ids()
     gainers, losers = [], []
-
     for symbol in FNO_SYMBOLS:
         sec_id = security_ids.get(symbol)
         if not sec_id:
-            print(f"No security ID for {symbol}")
             continue
-
         ltp, change_pct = get_price_at_time(symbol, sec_id, date_obj, time_obj)
         if ltp is None:
             continue
@@ -196,13 +175,11 @@ def get_movers_at_time(date_obj, time_obj):
             gainers.append((symbol, ltp, change_pct))
         elif -3 < change_pct < 0:
             losers.append((symbol, ltp, change_pct))
-
     gainers.sort(key=lambda x: x[2], reverse=True)
     losers.sort(key=lambda x: x[2])
     return gainers[:10], losers[:10]
 
 def get_live_movers():
-    """Get live FnO movers using NSE API"""
     session = requests.Session()
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
@@ -280,7 +257,7 @@ def home():
 @app.route("/webhook", methods=["POST"])
 def webhook():
     update = request.get_json(silent=True) or {}
-
+    chat_id = None
     try:
         msg = update.get("message", {})
         full_text = msg.get("text", "").strip()
@@ -290,19 +267,27 @@ def webhook():
         if not chat_id:
             return jsonify({"ok": True})
 
-     if text_lower == "/test":
-            # Test Dhan API with one stock
+        if text_lower == "/test":
             security_ids = get_security_ids()
             reliance_id = security_ids.get("RELIANCE", "NOT FOUND")
-            send_message(chat_id, f"Security IDs loaded: {len(security_ids)}\nRELIANCE ID: {reliance_id}")
-            
-            # Test intraday data
+            send_message(chat_id, f"✅ Security IDs loaded: {len(security_ids)}\nRELIANCE ID: `{reliance_id}`")
             if reliance_id != "NOT FOUND":
                 date_obj = datetime.datetime(2026, 4, 29)
                 time_obj = datetime.time(9, 25)
                 ltp, chg = get_price_at_time("RELIANCE", reliance_id, date_obj, time_obj)
-                send_message(chat_id, f"RELIANCE on 29-Apr at 9:25 AM:\nLTP: {ltp}\nChange: {chg}")
-            return jsonify({"ok": True})
+                send_message(chat_id, f"RELIANCE on 29-Apr at 9:25 AM:\nLTP: `{ltp}`\nChange: `{chg}`")
+
+        elif text_lower == "/start":
+            send_message(chat_id,
+                "👋 *FnO Alert Bot*\n\n"
+                "*Commands:*\n"
+                "📊 `/fno` — Today's live top 10\n"
+                "📅 `/fno 29-Apr` — Any date EOD\n"
+                "⏰ `/fno 29-Apr 9:25` — Any date at time\n"
+                "⏰ `/fno 15-04-2026 14:30` — Full date & time\n\n"
+                "⏰ Auto alert every weekday at 9:25 AM IST"
+            )
+
         elif text_lower.startswith("/fno"):
             parts = full_text.split(maxsplit=1)
             args = parts[1].strip() if len(parts) > 1 else ""
@@ -318,12 +303,13 @@ def webhook():
                 date_label = date_obj.strftime("%d %b %Y")
                 time_obj = time_obj or datetime.time(15, 30)
                 time_label = time_obj.strftime("%I:%M %p")
-                send_message(chat_id, f"⏳ Fetching data for *{date_label}* at *{time_label}*...\n_This may take 1-2 minutes_")
+                send_message(chat_id, f"⏳ Fetching *{date_label}* at *{time_label}*...\n_May take 1-2 mins_")
                 gainers, losers = get_movers_at_time(date_obj, time_obj)
                 send_message(chat_id, build_message(gainers, losers, date_label=date_label, time_label=time_label))
 
     except Exception as e:
         print(f"Error: {e}")
-        send_message(chat_id, "❌ Something went wrong. Please try again!")
+        if chat_id:
+            send_message(chat_id, f"❌ Error: {str(e)}")
 
     return jsonify({"ok": True})

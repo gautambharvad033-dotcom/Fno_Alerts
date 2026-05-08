@@ -130,11 +130,10 @@ def get_price_at_time(symbol, sec_id, date_obj, time_obj):
         timestamps = data.get("data", {}).get("timestamp", [])
         closes = data.get("data", {}).get("close", [])
         opens_list = data.get("data", {}).get("open", [])
-
+print(f"Dhan response for {symbol}: {str(data)[:500]}")
         if not timestamps or not closes:
-            print(f"Empty data for {symbol}: {data}")
+            print(f"Empty data for {symbol}")
             return None, None
-
         target_seconds = time_obj.hour * 3600 + time_obj.minute * 60
         best_idx = 0
         best_diff = float("inf")

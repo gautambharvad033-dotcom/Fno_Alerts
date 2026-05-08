@@ -75,7 +75,7 @@ def get_security_ids():
                 inst = row.get("SEM_INSTRUMENT_NAME", "").strip()
                 if seg == "NSE" and inst == "EQUITY" and symbol and sec_id:
                     _security_id_cache[symbol] = sec_id
-            except:
+            except Exception:
                 continue
         print(f"Loaded {len(_security_id_cache)} security IDs")
     except Exception as e:
@@ -98,7 +98,7 @@ def parse_input(text):
                     dt = dt.replace(year=today.year)
                 date_obj = dt
                 break
-            except:
+            except Exception:
                 continue
     if len(parts) >= 2:
         time_str = parts[1]
@@ -107,9 +107,27 @@ def parse_input(text):
                 t = datetime.datetime.strptime(time_str, fmt)
                 time_obj = t.time()
                 break
-            except:
+            except Exception:
                 continue
     return date_obj, time_obj
+
+
+def test_dhan_api(sec_id, date_obj, time_obj):
+    try:
+        date_str = date_obj.strftime("%Y-%m-%d")
+        url = "https://api.dhan.co/v2/charts/intraday"
+        payload = {
+            "securityId": sec_id,
+            "exchangeSegment": "NSE_EQ",
+            "instrument": "EQUITY",
+            "interval": "1",
+            "fromDate": date_str,
+            "toDate": date_str
+        }
+        r = requests.post(url, json=payload, headers=DHAN_HEADERS, timeout=10)
+        return r.status_code, str(r.text)[:1000]
+    except Exception as e:
+        return None, str(e)
 
 
 def get_price_at_time(symbol, sec_id, date_obj, time_obj):
@@ -126,13 +144,10 @@ def get_price_at_time(symbol, sec_id, date_obj, time_obj):
         }
         r = requests.post(url, json=payload, headers=DHAN_HEADERS, timeout=10)
         data = r.json()
-
         timestamps = data.get("data", {}).get("timestamp", [])
         closes = data.get("data", {}).get("close", [])
         opens_list = data.get("data", {}).get("open", [])
-print(f"Dhan response for {symbol}: {str(data)[:500]}")
         if not timestamps or not closes:
-            print(f"Empty data for {symbol}")
             return None, None
         target_seconds = time_obj.hour * 3600 + time_obj.minute * 60
         best_idx = 0
@@ -144,7 +159,6 @@ print(f"Dhan response for {symbol}: {str(data)[:500]}")
             if diff < best_diff:
                 best_diff = diff
                 best_idx = i
-
         prev_url = "https://api.dhan.co/v2/charts/historical"
         prev_date = (date_obj - datetime.timedelta(days=5)).strftime("%Y-%m-%d")
         prev_payload = {
@@ -212,7 +226,7 @@ def get_live_movers():
                         gainers.append((symbol, ltp, change_pct))
                     elif -3 < change_pct < 0:
                         losers.append((symbol, ltp, change_pct))
-            except:
+            except Exception:
                 continue
     except Exception as e:
         print(f"API error: {e}")
@@ -287,14 +301,14 @@ def webhook():
             if reliance_id != "NOT FOUND":
                 date_obj = datetime.datetime(2026, 4, 29)
                 time_obj = datetime.time(9, 25)
-                ltp, chg = get_price_at_time("RELIANCE", reliance_id, date_obj, time_obj)
-                send_message(chat_id, f"RELIANCE on 29-Apr at 9:25 AM:\nLTP: `{ltp}`\nChange: `{chg}`")
+                status, response = test_dhan_api(reliance_id, date_obj, time_obj)
+                send_message(chat_id, f"Dhan API Status: `{status}`\nResponse: `{response}`")
 
         elif text_lower == "/start":
             send_message(chat_id,
                 "👋 *FnO Alert Bot*\n\n"
                 "*Commands:*\n"
-                "📊 `/fno` - Today's live top 10\n"
+                "📊 `/fno` - Today live top 10\n"
                 "📅 `/fno 29-Apr` - Any date EOD\n"
                 "⏰ `/fno 29-Apr 9:25` - Any date at time\n"
                 "⏰ `/fno 15-04-2026 14:30` - Full date and time\n\n"
@@ -323,6 +337,6 @@ def webhook():
     except Exception as e:
         print(f"Error: {e}")
         if chat_id:
-            send_message(chat_id, f"❌ Error: {str(e)}")
+            send_message(chat_id, f"Error: {str(e)}")
 
     return jsonify({"ok": True})

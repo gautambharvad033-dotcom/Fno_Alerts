@@ -1,20 +1,71 @@
 from flask import Flask, request, jsonify
 import requests
 import datetime
-import csv
-import io
 
-app = Flask(__name__)
-
-BOT_TOKEN = "8613392574:AAF83_86w1TGHdYuZF5ZXjwQPJQD8ss7fCM"
-DHAN_API_KEY = "d0936e40-17de-411e-9b61-46c71b89a775"
-DHAN_CLIENT_ID = "2605079885"
-
-DHAN_HEADERS = {
-    "access-token": DHAN_API_KEY,
-    "client-id": DHAN_CLIENT_ID,
-    "Content-Type": "application/json"
+YAHOO_SPECIAL = {
+    "BAJAJ-AUTO": "BAJAJ-AUTO.NS",
+    "NAM-INDIA": "NAM-INDIA.NS",
+    "360ONE": "360ONE.NS",
 }
+
+def get_yahoo_symbol(symbol):
+    return YAHOO_SPECIAL.get(symbol, f"{symbol}.NS")
+
+def get_price_at_time_yahoo(symbol, date_obj, time_obj):
+    try:
+        yahoo_symbol = get_yahoo_symbol(symbol)
+        date_ts = int(datetime.datetime(date_obj.year, date_obj.month, date_obj.day, 0, 0, 0).timestamp())
+        end_ts = date_ts + 86400
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}"
+        params = {
+            "period1": date_ts,
+            "period2": end_ts,
+            "interval": "1m",
+            "includePrePost": "false"
+        }
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        r = requests.get(url, params=params, headers=headers, timeout=10)
+        data = r.json()
+        result = data.get("chart", {}).get("result", [])
+        if not result:
+            return None, None
+        timestamps = result[0].get("timestamp", [])
+        closes = result[0].get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        prev_close = result[0].get("meta", {}).get("chartPreviousClose", None)
+        if not timestamps or not closes or prev_close is None:
+            return None, None
+        target_seconds = time_obj.hour * 3600 + time_obj.minute * 60
+        best_idx = None
+        best_diff = float("inf")
+        for i, ts in enumerate(timestamps):
+            ist_dt = datetime.datetime.utcfromtimestamp(ts) + datetime.timedelta(hours=5, minutes=30)
+            candle_seconds = ist_dt.hour * 3600 + ist_dt.minute * 60
+            diff = abs(candle_seconds - target_seconds)
+            if diff < best_diff and i < len(closes) and closes[i] is not None:
+                best_diff = diff
+                best_idx = i
+        if best_idx is None:
+            return None, None
+        ltp = closes[best_idx]
+        change_pct = ((ltp - prev_close) / prev_close) * 100
+        return round(ltp, 2), round(change_pct, 2)
+    except Exception as e:
+        print(f"Error {symbol}: {e}")
+        return None, None
+
+def get_movers_at_time(date_obj, time_obj):
+    gainers, losers = [], []
+    for symbol in FNO_SYMBOLS:
+        ltp, change_pct = get_price_at_time_yahoo(symbol, date_obj, time_obj)
+        if ltp is None:
+            continue
+        if 0 < change_pct < 3:
+            gainers.append((symbol, ltp, change_pct))
+        elif -3 < change_pct < 0:
+            losers.append((symbol, ltp, change_pct))
+    gainers.sort(key=lambda x: x[2], reverse=True)
+    losers.sort(key=lambda x: x[2])
+    return gainers[:10], losers[:10]
 
 FNO_SYMBOLS = [
     "ETERNAL", "RELIANCE", "BANDHANBNK", "MAZDOCK", "VEDL", "HDFCBANK",
@@ -293,11 +344,11 @@ def webhook():
 
         if not chat_id:
             return jsonify({"ok": True})
-
-        if text_lower == "/test":
-            security_ids = get_security_ids()
-            reliance_id = security_ids.get("RELIANCE", "NOT FOUND")
-            send_message(chat_id, f"Security IDs loaded: {len(security_ids)}\nRELIANCE ID: `{reliance_id}`")
+if text_lower == "/test":
+            date_obj = datetime.datetime(2026, 4, 29)
+            time_obj = datetime.time(9, 25)
+            ltp, chg = get_price_at_time_yahoo("RELIANCE", date_obj, time_obj)
+            send_message(chat_id, f"Yahoo Test:\nRELIANCE 29-Apr 9:25AM\nLTP: `{ltp}`\nChange: `{chg}%`")
             if reliance_id != "NOT FOUND":
                 date_obj = datetime.datetime(2026, 4, 29)
                 status, response = test_dhan_api(reliance_id, date_obj)

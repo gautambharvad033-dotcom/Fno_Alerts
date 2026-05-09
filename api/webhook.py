@@ -7,11 +7,11 @@ import io
 app = Flask(__name__)
 
 BOT_TOKEN = "8613392574:AAF83_86w1TGHdYuZF5ZXjwQPJQD8ss7fCM"
-DHAN_ACCESS_TOKEN = "eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbkNvbnN1bWVyVHlwZSI6IlNFTEYiLCJwYXJ0bmVySWQiOiIiLCJkaGFuQ2xpZW50SWQiOiIyNjA1MDc5ODg1Iiwid2ViaG9va1VybCI6IiIsImlzcyI6ImRoYW4iLCJleHAiOjE3ODA3MjMyODh9.HYPv4UfnDeD-1cXNVemh0McAIXi07zCwH0utQMi1CAu5PqAuFmcJownph0AGL1k1OcAvF3ukGUgm-_fP5chtPw"
+DHAN_API_KEY = "d0936e40-17de-411e-9b61-46c71b89a775"
 DHAN_CLIENT_ID = "2605079885"
 
 DHAN_HEADERS = {
-    "access-token": DHAN_ACCESS_TOKEN,
+    "access-token": DHAN_API_KEY,
     "client-id": DHAN_CLIENT_ID,
     "Content-Type": "application/json"
 }
@@ -112,7 +112,7 @@ def parse_input(text):
     return date_obj, time_obj
 
 
-def test_dhan_api(sec_id, date_obj, time_obj):
+def test_dhan_api(sec_id, date_obj):
     try:
         date_str = date_obj.strftime("%Y-%m-%d")
         url = "https://api.dhan.co/v2/charts/intraday"
@@ -125,7 +125,7 @@ def test_dhan_api(sec_id, date_obj, time_obj):
             "toDate": date_str
         }
         r = requests.post(url, json=payload, headers=DHAN_HEADERS, timeout=10)
-        return r.status_code, str(r.text)[:1000]
+        return r.status_code, str(r.text)[:500]
     except Exception as e:
         return None, str(e)
 
@@ -300,8 +300,7 @@ def webhook():
             send_message(chat_id, f"Security IDs loaded: {len(security_ids)}\nRELIANCE ID: `{reliance_id}`")
             if reliance_id != "NOT FOUND":
                 date_obj = datetime.datetime(2026, 4, 29)
-                time_obj = datetime.time(9, 25)
-                status, response = test_dhan_api(reliance_id, date_obj, time_obj)
+                status, response = test_dhan_api(reliance_id, date_obj)
                 send_message(chat_id, f"Dhan API Status: `{status}`\nResponse: `{response}`")
 
         elif text_lower == "/start":

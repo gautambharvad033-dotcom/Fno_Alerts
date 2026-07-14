@@ -354,9 +354,8 @@ def webhook():
                 gainers, losers, breadth = get_movers_at_time(date_obj, time_obj)
                 send_message(chat_id, build_message(gainers, losers, breadth, date_label=date_label, time_label=time_label))
 
-    except Exception as e:
+except Exception as e:
         print(f"Error: {e}")
         if chat_id:
             send_message(chat_id, f"Error: {str(e)}")
-
-    return jsonify({"ok": True})
+                return jsonify({"ok": True})

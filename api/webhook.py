@@ -2,10 +2,10 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-@app.route("/", methods=["GET"])
+@app.route("/api/webhook", methods=["GET"])
 def home():
     return "FnO Bot is running! ✅", 200
 
-@app.route("/", methods=["POST"])  
+@app.route("/api/webhook", methods=["POST"])
 def webhook():
     return jsonify({"ok": True})

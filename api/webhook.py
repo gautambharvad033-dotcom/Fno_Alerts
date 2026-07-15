@@ -445,14 +445,14 @@ def answer_callback(callback_query_id):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery"
     requests.post(url, json={"callback_query_id": callback_query_id})
 
-
-@app.route("/api/webhook", methods=["GET"])
+@app.route("/", methods=["GET"])
 def home():
     return "FnO Bot is running! ✅", 200
 
 
-@app.route("/api/webhook", methods=["POST"])
+@app.route("/", methods=["POST"])
 def webhook():
+
     update = request.get_json(silent=True) or {}
     chat_id = None
     try:

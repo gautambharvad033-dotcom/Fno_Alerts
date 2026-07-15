@@ -126,7 +126,14 @@ def get_price_at_time_yahoo(symbol, date_obj, time_obj):
         prev_close = result[0].get("meta", {}).get("chartPreviousClose", None)
         if not timestamps or not closes or prev_close is None:
             return None, None
-        target_seconds = time_obj.hour * 3600 + time_obj.minute * 60
+
+        # Fix: if user requests 9:15, shift to 9:16 for first complete candle
+        hour = time_obj.hour
+        minute = time_obj.minute
+        if hour == 9 and minute == 15:
+            minute = 16
+
+        target_seconds = hour * 3600 + minute * 60
         best_idx = None
         best_diff = float("inf")
         for i, ts in enumerate(timestamps):
@@ -215,6 +222,56 @@ def get_nifty_change():
     return None
 
 
+def get_all_sectors_snapshot():
+    session = requests.Session()
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Referer": "https://www.nseindia.com",
+        "Accept": "application/json"
+    }
+    session.get("https://www.nseindia.com", headers=headers, timeout=10)
+    try:
+        url = "https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
+        r = session.get(url, headers=headers, timeout=10)
+        data = r.json()
+        stocks = data.get("data", [])
+        stock_map = {s.get("symbol"): s for s in stocks}
+    except Exception as e:
+        print(f"Snapshot error: {e}")
+        return []
+
+    results = []
+    for sector, symbols in SECTOR_STOCKS.items():
+        advances = 0
+        declines = 0
+        unchanged = 0
+        total_change = 0
+        count = 0
+        for symbol in symbols:
+            if symbol in stock_map:
+                change_pct = stock_map[symbol].get("pChange", 0)
+                if change_pct > 0:
+                    advances += 1
+                elif change_pct < 0:
+                    declines += 1
+                else:
+                    unchanged += 1
+                total_change += change_pct
+                count += 1
+        avg_change = total_change / count if count > 0 else 0
+        results.append({
+            "sector": sector,
+            "advances": advances,
+            "declines": declines,
+            "unchanged": unchanged,
+            "total": count,
+            "avg_change": avg_change
+        })
+
+    results.sort(key=lambda x: x["avg_change"], reverse=True)
+    return results
+
+
 def get_verdict(advances, declines):
     total = advances + declines
     if total == 0:
@@ -230,6 +287,29 @@ def get_verdict(advances, declines):
         return "BEARISH 🔴"
     else:
         return "STRONGLY BEARISH 🔴"
+
+
+def build_sectors_snapshot(sectors_data, date_label):
+    lines = ""
+    for s in sectors_data:
+        sector = s["sector"]
+        label = SECTOR_LABELS.get(sector, sector)
+        adv = s["advances"]
+        dec = s["declines"]
+        avg = s["avg_change"]
+        emoji = "🟢" if avg > 0 else "🔴"
+        sign = "+" if avg > 0 else ""
+        lines += f"{emoji} {label:<14} A:{adv}  D:{dec}  {sign}{avg:.2f}%\n"
+
+    return (
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 *Sector Snapshot*\n"
+        f"📅 {date_label}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"{lines}\n"
+        f"_Tap /sector to drill into any sector_\n"
+        f"━━━━━━━━━━━━━━━━━━━"
+    )
 
 
 def build_message(gainers, losers, breadth, date_label, time_label=None, sector=None, nifty_change=None):
@@ -392,7 +472,10 @@ def webhook():
                 send_message(chat_id, f"⏳ Fetching {label} data...")
                 nifty_change = get_nifty_change()
                 gainers, losers, breadth = get_movers(symbols, live=True)
-                send_message(chat_id, build_message(gainers, losers, breadth, date_label=today, sector=None if sector == "ALL" else sector, nifty_change=nifty_change))
+                send_message(chat_id, build_message(gainers, losers, breadth,
+                    date_label=today,
+                    sector=None if sector == "ALL" else sector,
+                    nifty_change=nifty_change))
             return jsonify({"ok": True})
 
         msg = update.get("message", {})
@@ -402,15 +485,23 @@ def webhook():
         if not chat_id:
             return jsonify({"ok": True})
 
-        if text_lower == "/start":
+        if text_lower == "/sectors":
+            send_message(chat_id, "⏳ Fetching all sectors snapshot...")
+            today = datetime.datetime.now(IST).strftime("%d %b %Y")
+            sectors_data = get_all_sectors_snapshot()
+            send_message(chat_id, build_sectors_snapshot(sectors_data, today))
+
+        elif text_lower == "/start":
             send_message(chat_id,
                 "👋 *FnO Alert Bot*\n\n"
                 "*Commands:*\n"
                 "📊 `/fno` - Today live top 10\n"
                 "📅 `/fno 29-Apr 9:25` - Any date at time\n"
+                "📈 `/sectors` - All sectors snapshot\n"
                 "🏷️ `/sector` - Browse by sector\n"
                 "🏷️ `/sector bank 29-Apr 9:25` - Sector on any date\n\n"
-                "⏰ Auto alert every weekday at 9:25 AM IST"
+                "⏰ Auto alert every weekday at 9:25 AM IST\n\n"
+                "_Note: Use 9:16 instead of 9:15 for first candle data_"
             )
 
         elif text_lower.startswith("/sector"):
@@ -423,46 +514,7 @@ def webhook():
                 sector_key = arg_parts[0].upper()
                 rest = arg_parts[1] if len(arg_parts) > 1 else ""
                 if sector_key not in SECTOR_STOCKS:
-                    send_message(chat_id, "❌ Invalid sector! Use: BANK, IT, AUTO, PHARMA, FMCG, METAL, REALTY, ENERGY, FINSERV, PSUBANK")
+                    send_message(chat_id, "❌ Invalid sector!\nUse: BANK, IT, AUTO, PHARMA, FMCG, METAL, REALTY, ENERGY, FINSERV, PSUBANK")
                     return jsonify({"ok": True})
                 symbols = SECTOR_STOCKS[sector_key]
-                label = SECTOR_LABELS.get(sector_key, sector_key)
-                if not rest:
-                    today = datetime.datetime.now(IST).strftime("%d %b %Y")
-                    send_message(chat_id, f"⏳ Fetching {label} live data...")
-                    nifty_change = get_nifty_change()
-                    gainers, losers, breadth = get_movers(symbols, live=True)
-                    send_message(chat_id, build_message(gainers, losers, breadth, date_label=today, sector=sector_key, nifty_change=nifty_change))
-                else:
-                    date_obj, time_obj = parse_input(rest)
-                    date_label = date_obj.strftime("%d %b %Y")
-                    time_obj = time_obj or datetime.time(15, 30)
-                    time_label = time_obj.strftime("%I:%M %p")
-                    send_message(chat_id, f"⏳ Fetching {label} for *{date_label}* at *{time_label}*...")
-                    gainers, losers, breadth = get_movers(symbols, date_obj=date_obj, time_obj=time_obj)
-                    send_message(chat_id, build_message(gainers, losers, breadth, date_label=date_label, time_label=time_label, sector=sector_key))
-
-        elif text_lower.startswith("/fno"):
-            parts = full_text.split(maxsplit=1)
-            args = parts[1].strip() if len(parts) > 1 else ""
-            if not args:
-                send_message(chat_id, "⏳ Fetching live FnO data...")
-                nifty_change = get_nifty_change()
-                gainers, losers, breadth = get_movers(FNO_SYMBOLS, live=True)
-                today = datetime.datetime.now(IST).strftime("%d %b %Y")
-                send_message(chat_id, build_message(gainers, losers, breadth, date_label=today, nifty_change=nifty_change))
-            else:
-                date_obj, time_obj = parse_input(args)
-                date_label = date_obj.strftime("%d %b %Y")
-                time_obj = time_obj or datetime.time(15, 30)
-                time_label = time_obj.strftime("%I:%M %p")
-                send_message(chat_id, f"⏳ Fetching *{date_label}* at *{time_label}*...\n_May take 2-3 mins_")
-                gainers, losers, breadth = get_movers(FNO_SYMBOLS, date_obj=date_obj, time_obj=time_obj)
-                send_message(chat_id, build_message(gainers, losers, breadth, date_label=date_label, time_label=time_label))
-
-    except Exception as e:
-        print(f"Error: {e}")
-        if chat_id:
-            send_message(chat_id, f"Error: {str(e)}")
-
-    return jsonify({"ok": True})
+ 

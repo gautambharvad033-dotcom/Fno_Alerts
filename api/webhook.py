@@ -71,7 +71,7 @@ FNO_SYMBOLS = list(set([s for stocks in SECTOR_STOCKS.values() for s in stocks] 
     "SUZLON", "ADANIENT", "SWIGGY", "SAMMAANCAP", "TMPV", "INDIGO",
     "MCX", "RECLTD", "CROMPTON", "SHRIRAMFIN", "POLICYBZR", "CGPOWER",
     "HYUNDAI", "HINDPETRO", "SOLARINDS", "SRF", "DIVISLAB", "PNBHOUSING",
-    "CONCOR", "MPHASIS", "LTM", "LICHSGFIN", "INOXWIND", "TATACONSUM",
+    "MPHASIS", "LTM", "LICHSGFIN", "INOXWIND", "TATACONSUM",
     "ZYDUSLIFE", "AMBUJACEM", "APLAPOLLO", "COLPAL", "PRESTIGE",
     "MARICO", "ICICIPRULI", "GODREJCP", "PATANJALI", "DABUR", "MARUTI",
     "COCHINSHIP", "OFSS", "VBL", "NATIONALUM", "HINDZINC", "NESTLEIND",
@@ -79,7 +79,7 @@ FNO_SYMBOLS = list(set([s for stocks in SECTOR_STOCKS.values() for s in stocks] 
     "EICHERMOT", "OIL", "NMDC", "NHPC", "BDL", "FEDERALBNK",
     "COFORGE", "MAXHEALTH", "JSWENERGY", "GODREJPROP", "DLF",
     "ASIANPAINT", "PETRONET", "BAJAJFINSV", "ANGELONE", "IREDA",
-    "PIIND", "GMRAIRPORT", "BANKINDIA", "DALBHARAT", "PHOENIXLTD",
+    "GMRAIRPORT", "BANKINDIA", "DALBHARAT", "PHOENIXLTD",
     "NBCC", "FORTIS", "ICICIGI", "MANKIND", "ALKEM", "NUVAMA"
 ]))
 
@@ -126,13 +126,10 @@ def get_price_at_time_yahoo(symbol, date_obj, time_obj):
         prev_close = result[0].get("meta", {}).get("chartPreviousClose", None)
         if not timestamps or not closes or prev_close is None:
             return None, None
-
-        # Fix: if user requests 9:15, shift to 9:16 for first complete candle
         hour = time_obj.hour
         minute = time_obj.minute
         if hour == 9 and minute == 15:
             minute = 16
-
         target_seconds = hour * 3600 + minute * 60
         best_idx = None
         best_diff = float("inf")
@@ -267,7 +264,6 @@ def get_all_sectors_snapshot():
             "total": count,
             "avg_change": avg_change
         })
-
     results.sort(key=lambda x: x["avg_change"], reverse=True)
     return results
 
@@ -278,15 +274,15 @@ def get_verdict(advances, declines):
         return "No data"
     ratio = advances / total * 100
     if ratio >= 70:
-        return "STRONGLY BULLISH 🟢"
+        return "STRONGLY BULLISH"
     elif ratio >= 55:
-        return "BULLISH 🟢"
+        return "BULLISH"
     elif ratio >= 45:
-        return "NEUTRAL ⚪"
+        return "NEUTRAL"
     elif ratio >= 30:
-        return "BEARISH 🔴"
+        return "BEARISH"
     else:
-        return "STRONGLY BEARISH 🔴"
+        return "STRONGLY BEARISH"
 
 
 def build_sectors_snapshot(sectors_data, date_label):
@@ -299,7 +295,7 @@ def build_sectors_snapshot(sectors_data, date_label):
         avg = s["avg_change"]
         emoji = "🟢" if avg > 0 else "🔴"
         sign = "+" if avg > 0 else ""
-        lines += f"{emoji} {label:<14} A:{adv}  D:{dec}  {sign}{avg:.2f}%\n"
+        lines += f"{emoji} {label}  A:{adv}  D:{dec}  {sign}{avg:.2f}%\n"
 
     return (
         f"━━━━━━━━━━━━━━━━━━━\n"
@@ -445,6 +441,7 @@ def answer_callback(callback_query_id):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery"
     requests.post(url, json={"callback_query_id": callback_query_id})
 
+
 @app.route("/", methods=["GET"])
 def home():
     return "FnO Bot is running! ✅", 200
@@ -452,7 +449,6 @@ def home():
 
 @app.route("/", methods=["POST"])
 def webhook():
-
     update = request.get_json(silent=True) or {}
     chat_id = None
     try:
@@ -501,7 +497,7 @@ def webhook():
                 "🏷️ `/sector` - Browse by sector\n"
                 "🏷️ `/sector bank 29-Apr 9:25` - Sector on any date\n\n"
                 "⏰ Auto alert every weekday at 9:25 AM IST\n\n"
-                "_Note: Use 9:16 instead of 9:15 for first candle data_"
+                "_Note: Use 9:16 instead of 9:15 for first candle_"
             )
 
         elif text_lower.startswith("/sector"):
@@ -517,4 +513,47 @@ def webhook():
                     send_message(chat_id, "❌ Invalid sector!\nUse: BANK, IT, AUTO, PHARMA, FMCG, METAL, REALTY, ENERGY, FINSERV, PSUBANK")
                     return jsonify({"ok": True})
                 symbols = SECTOR_STOCKS[sector_key]
- 
+                label = SECTOR_LABELS.get(sector_key, sector_key)
+                if not rest:
+                    today = datetime.datetime.now(IST).strftime("%d %b %Y")
+                    send_message(chat_id, f"⏳ Fetching {label} live data...")
+                    nifty_change = get_nifty_change()
+                    gainers, losers, breadth = get_movers(symbols, live=True)
+                    send_message(chat_id, build_message(gainers, losers, breadth,
+                        date_label=today, sector=sector_key, nifty_change=nifty_change))
+                else:
+                    date_obj, time_obj = parse_input(rest)
+                    date_label = date_obj.strftime("%d %b %Y")
+                    time_obj = time_obj or datetime.time(15, 30)
+                    time_label = time_obj.strftime("%I:%M %p")
+                    send_message(chat_id, f"⏳ Fetching {label} for *{date_label}* at *{time_label}*...")
+                    gainers, losers, breadth = get_movers(symbols, date_obj=date_obj, time_obj=time_obj)
+                    send_message(chat_id, build_message(gainers, losers, breadth,
+                        date_label=date_label, time_label=time_label, sector=sector_key))
+
+        elif text_lower.startswith("/fno"):
+            parts = full_text.split(maxsplit=1)
+            args = parts[1].strip() if len(parts) > 1 else ""
+            if not args:
+                send_message(chat_id, "⏳ Fetching live FnO data...")
+                nifty_change = get_nifty_change()
+                gainers, losers, breadth = get_movers(FNO_SYMBOLS, live=True)
+                today = datetime.datetime.now(IST).strftime("%d %b %Y")
+                send_message(chat_id, build_message(gainers, losers, breadth,
+                    date_label=today, nifty_change=nifty_change))
+            else:
+                date_obj, time_obj = parse_input(args)
+                date_label = date_obj.strftime("%d %b %Y")
+                time_obj = time_obj or datetime.time(15, 30)
+                time_label = time_obj.strftime("%I:%M %p")
+                send_message(chat_id, f"⏳ Fetching *{date_label}* at *{time_label}*...\n_May take 2-3 mins_")
+                gainers, losers, breadth = get_movers(FNO_SYMBOLS, date_obj=date_obj, time_obj=time_obj)
+                send_message(chat_id, build_message(gainers, losers, breadth,
+                    date_label=date_label, time_label=time_label))
+
+    except Exception as e:
+        print(f"Error: {e}")
+        if chat_id:
+            send_message(chat_id, f"Error: {str(e)}")
+
+    return jsonify({"ok": True})

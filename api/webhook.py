@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify
 import requests
 import datetime
+...
 
 app = Flask(__name__)
 

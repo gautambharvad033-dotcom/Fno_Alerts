@@ -7,100 +7,39 @@ app = Flask(__name__)
 BOT_TOKEN = "8613392574:AAF83_86w1TGHdYuZF5ZXjwQPJQD8ss7fCM"
 
 SECTOR_STOCKS = {
-    "BANK": [
-        "HDFCBANK", "ICICIBANK", "SBIN", "AXISBANK", "KOTAKBANK", "BANDHANBNK",
-        "FEDERALBNK", "IDFCFIRSTB", "INDUSINDBK", "BANKBARODA", "PNB", "CANBK",
-        "UNIONBANK", "INDIANB", "RBLBANK", "YESBANK", "AUBANK", "BANKINDIA"
-    ],
-    "IT": [
-        "TCS", "INFY", "HCLTECH", "WIPRO", "TECHM", "MPHASIS", "COFORGE",
-        "PERSISTENT", "OFSS", "KPITTECH"
-    ],
-    "AUTO": [
-        "MARUTI", "BAJAJ-AUTO", "TVSMOTOR", "EICHERMOT", "HEROMOTOCO",
-        "ASHOKLEY", "MOTHERSON", "BHARATFORG", "BOSCHLTD", "UNOMINDA",
-        "TIINDIA", "HYUNDAI"
-    ],
-    "PHARMA": [
-        "SUNPHARMA", "DRREDDY", "CIPLA", "LUPIN", "AUROPHARMA", "DIVISLAB",
-        "ALKEM", "GLENMARK", "LAURUSLABS", "BIOCON", "ZYDUSLIFE", "MANKIND"
-    ],
-    "FMCG": [
-        "HINDUNILVR", "ITC", "NESTLEIND", "BRITANNIA", "DABUR", "MARICO",
-        "COLPAL", "GODREJCP", "TATACONSUM", "VBL", "PATANJALI"
-    ],
-    "METAL": [
-        "TATASTEEL", "JSWSTEEL", "HINDALCO", "VEDL", "SAIL", "NMDC",
-        "NATIONALUM", "HINDZINC", "COALINDIA", "APLAPOLLO"
-    ],
-    "REALTY": [
-        "DLF", "GODREJPROP", "OBEROIRLTY", "PHOENIXLTD", "LODHA", "PRESTIGE"
-    ],
-    "ENERGY": [
-        "RELIANCE", "ONGC", "BPCL", "IOC", "HINDPETRO", "GAIL",
-        "OIL", "PETRONET", "ADANIGREEN", "TATAPOWER", "ADANIPOWER",
-        "NTPC", "POWERGRID", "NHPC", "ADANIENSOL", "WAAREEENER",
-        "INOXWIND", "SOLARINDS", "POWERINDIA"
-    ],
-    "FINSERV": [
-        "BAJFINANCE", "BAJAJFINSV", "HDFCLIFE", "SBILIFE", "ICICIGI",
-        "ICICIPRULI", "MUTHOOTFIN", "CHOLAFIN", "SHRIRAMFIN", "MANAPPURAM",
-        "PNBHOUSING", "LICHSGFIN", "MFSL", "HDFCAMC", "ABCAPITAL",
-        "IRFC", "RECLTD", "PFC", "IREDA", "LTF", "ANGELONE",
-        "MOTILALOFS", "JIOFIN"
-    ],
-    "PSUBANK": [
-        "SBIN", "BANKBARODA", "PNB", "CANBK", "UNIONBANK",
-        "INDIANB", "BANKINDIA", "MAZDOCK", "BDL", "COCHINSHIP"
-    ]
+    "BANK": ["HDFCBANK","ICICIBANK","SBIN","AXISBANK","KOTAKBANK","BANDHANBNK","FEDERALBNK","IDFCFIRSTB","INDUSINDBK","BANKBARODA","PNB","CANBK","UNIONBANK","INDIANB","RBLBANK","YESBANK","AUBANK","BANKINDIA"],
+    "IT": ["TCS","INFY","HCLTECH","WIPRO","TECHM","MPHASIS","COFORGE","PERSISTENT","OFSS","KPITTECH"],
+    "AUTO": ["MARUTI","BAJAJ-AUTO","TVSMOTOR","EICHERMOT","HEROMOTOCO","ASHOKLEY","MOTHERSON","BHARATFORG","BOSCHLTD","UNOMINDA","TIINDIA","HYUNDAI"],
+    "PHARMA": ["SUNPHARMA","DRREDDY","CIPLA","LUPIN","AUROPHARMA","DIVISLAB","ALKEM","GLENMARK","LAURUSLABS","BIOCON","ZYDUSLIFE","MANKIND"],
+    "FMCG": ["HINDUNILVR","ITC","NESTLEIND","BRITANNIA","DABUR","MARICO","COLPAL","GODREJCP","TATACONSUM","VBL","PATANJALI"],
+    "METAL": ["TATASTEEL","JSWSTEEL","HINDALCO","VEDL","SAIL","NMDC","NATIONALUM","HINDZINC","COALINDIA","APLAPOLLO"],
+    "REALTY": ["DLF","GODREJPROP","OBEROIRLTY","PHOENIXLTD","LODHA","PRESTIGE"],
+    "ENERGY": ["RELIANCE","ONGC","BPCL","IOC","HINDPETRO","GAIL","OIL","PETRONET","ADANIGREEN","TATAPOWER","ADANIPOWER","NTPC","POWERGRID","NHPC","ADANIENSOL","WAAREEENER","INOXWIND","SOLARINDS","POWERINDIA"],
+    "FINSERV": ["BAJFINANCE","BAJAJFINSV","HDFCLIFE","SBILIFE","ICICIGI","ICICIPRULI","MUTHOOTFIN","CHOLAFIN","SHRIRAMFIN","MANAPPURAM","PNBHOUSING","LICHSGFIN","MFSL","HDFCAMC","ABCAPITAL","IRFC","RECLTD","PFC","IREDA","LTF","ANGELONE","MOTILALOFS","JIOFIN"],
+    "PSUBANK": ["SBIN","BANKBARODA","PNB","CANBK","UNIONBANK","INDIANB","BANKINDIA","MAZDOCK","BDL","COCHINSHIP"]
 }
 
 FNO_SYMBOLS = list(set([s for stocks in SECTOR_STOCKS.values() for s in stocks] + [
-    "ETERNAL", "ADANIPORTS", "INDUSTOWER", "KAYNES", "FORCEMOT",
-    "BHEL", "BHARATFORG", "PAYTM", "BEL", "TRENT", "HAL",
-    "HAVELLS", "GODFRYPHLP", "SONACOMS", "KEI", "POLYCAB",
-    "NAUKRI", "CDSL", "TITAN", "RVNL", "MAXHEALTH", "APOLLOHOSP",
-    "ABB", "JSWENERGY", "SBICARD", "EXIDEIND", "GRASIM", "CUMMINSIND",
-    "ASTRAL", "BLUESTARCO", "KALYANKJIL", "TATAELXSI", "AMBER",
-    "SUPREMEIND", "JINDALSTEL", "JUBLFOOD", "CONCOR", "PIIND",
-    "VOLTAS", "INDHOTEL", "GMRAIRPORT", "PGEL", "DMART", "IEX",
-    "LICI", "UNITDSPR", "VMM", "DALBHARAT", "SIEMENS", "TORNTPHARM",
-    "PREMIERENE", "AMBUJACEM", "NBCC", "CAMS", "UPL", "FORTIS",
-    "DELHIVERY", "TIINDIA", "NYKAA", "PAGEIND", "KFINTECH",
-    "PIDILITIND", "SHREECEM", "BAJAJHLDNG", "NUVAMA", "DIXON",
-    "SUZLON", "ADANIENT", "SWIGGY", "SAMMAANCAP", "TMPV", "INDIGO",
-    "MCX", "CROMPTON", "SHRIRAMFIN", "POLICYBZR", "CGPOWER",
-    "HINDPETRO", "SOLARINDS", "SRF", "DIVISLAB", "PNBHOUSING",
-    "MPHASIS", "LTM", "LICHSGFIN", "INOXWIND", "TATACONSUM",
-    "ZYDUSLIFE", "AMBUJACEM", "APLAPOLLO", "COLPAL", "PRESTIGE",
-    "MARICO", "ICICIPRULI", "GODREJCP", "PATANJALI", "DABUR", "MARUTI",
-    "COCHINSHIP", "OFSS", "VBL", "NATIONALUM", "HINDZINC", "NESTLEIND",
-    "LODHA", "ADANIENSOL", "SAIL", "TATAPOWER", "ULTRACEMCO",
-    "EICHERMOT", "OIL", "NMDC", "NHPC", "BDL", "FEDERALBNK",
-    "COFORGE", "MAXHEALTH", "JSWENERGY", "GODREJPROP", "DLF",
-    "ASIANPAINT", "PETRONET", "BAJAJFINSV", "ANGELONE", "IREDA",
-    "GMRAIRPORT", "BANKINDIA", "DALBHARAT", "PHOENIXLTD",
-    "NBCC", "FORTIS", "ICICIGI", "MANKIND", "ALKEM", "NUVAMA"
+    "ETERNAL","ADANIPORTS","INDUSTOWER","KAYNES","FORCEMOT","BHEL","BHARATFORG","PAYTM","BEL","TRENT","HAL",
+    "HAVELLS","GODFRYPHLP","SONACOMS","KEI","POLYCAB","NAUKRI","CDSL","TITAN","RVNL","MAXHEALTH","APOLLOHOSP",
+    "ABB","JSWENERGY","SBICARD","EXIDEIND","GRASIM","CUMMINSIND","ASTRAL","BLUESTARCO","KALYANKJIL","TATAELXSI",
+    "AMBER","SUPREMEIND","JINDALSTEL","JUBLFOOD","CONCOR","PIIND","VOLTAS","INDHOTEL","GMRAIRPORT","PGEL","DMART",
+    "IEX","LICI","UNITDSPR","VMM","DALBHARAT","SIEMENS","TORNTPHARM","PREMIERENE","AMBUJACEM","NBCC","CAMS","UPL",
+    "FORTIS","DELHIVERY","TIINDIA","NYKAA","PAGEIND","KFINTECH","PIDILITIND","SHREECEM","BAJAJHLDNG","NUVAMA",
+    "DIXON","SUZLON","ADANIENT","SWIGGY","SAMMAANCAP","TMPV","INDIGO","MCX","CROMPTON","SHRIRAMFIN","POLICYBZR",
+    "CGPOWER","HINDPETRO","SOLARINDS","SRF","DIVISLAB","PNBHOUSING","MPHASIS","LTM","LICHSGFIN","INOXWIND",
+    "TATACONSUM","ZYDUSLIFE","APLAPOLLO","COLPAL","PRESTIGE","MARICO","ICICIPRULI","GODREJCP","PATANJALI","DABUR",
+    "MARUTI","COCHINSHIP","OFSS","VBL","NATIONALUM","HINDZINC","NESTLEIND","LODHA","ADANIENSOL","SAIL","TATAPOWER",
+    "ULTRACEMCO","EICHERMOT","OIL","NMDC","NHPC","BDL","FEDERALBNK","COFORGE","MAXHEALTH","JSWENERGY","GODREJPROP",
+    "DLF","ASIANPAINT","PETRONET","BAJAJFINSV","ANGELONE","IREDA","GMRAIRPORT","BANKINDIA","DALBHARAT","PHOENIXLTD",
+    "NBCC","FORTIS","ICICIGI","MANKIND","ALKEM","NUVAMA","AMBUJACEM"
 ]))
 
-YAHOO_SPECIAL = {
-    "BAJAJ-AUTO": "BAJAJ-AUTO.NS",
-    "NAM-INDIA": "NAM-INDIA.NS",
-    "360ONE": "360ONE.NS",
-    "M&M": "M%26M.NS",
-}
+YAHOO_SPECIAL = {"BAJAJ-AUTO":"BAJAJ-AUTO.NS","NAM-INDIA":"NAM-INDIA.NS","360ONE":"360ONE.NS","M&M":"M%26M.NS"}
 
 SECTOR_LABELS = {
-    "BANK": "🏦 Bank",
-    "IT": "💻 IT",
-    "AUTO": "🚗 Auto",
-    "PHARMA": "💊 Pharma",
-    "FMCG": "🛒 FMCG",
-    "METAL": "⚙️ Metal",
-    "REALTY": "🏢 Realty",
-    "ENERGY": "⚡ Energy",
-    "FINSERV": "💰 Fin Serv",
-    "PSUBANK": "🏛️ PSU Bank"
+    "BANK":"ðŸ¦ Bank","IT":"ðŸ’» IT","AUTO":"ðŸš— Auto","PHARMA":"ðŸ’Š Pharma","FMCG":"ðŸ›’ FMCG",
+    "METAL":"âš™ï¸ Metal","REALTY":"ðŸ¢ Realty","ENERGY":"âš¡ Energy","FINSERV":"ðŸ’° Fin Serv","PSUBANK":"ðŸ›ï¸ PSU Bank"
 }
 
 
@@ -154,15 +93,10 @@ def get_movers(symbols, date_obj=None, time_obj=None, live=False):
     all_stocks = []
     if live:
         session = requests.Session()
-        hdrs = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Referer": "https://www.nseindia.com",
-            "Accept": "application/json"
-        }
+        hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Referer": "https://www.nseindia.com", "Accept": "application/json"}
         session.get("https://www.nseindia.com", headers=hdrs, timeout=10)
         try:
-            url = "https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O"
-            r = session.get(url, headers=hdrs, timeout=10)
+            r = session.get("https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O", headers=hdrs, timeout=10)
             stock_map = {s.get("symbol"): s for s in r.json().get("data", [])}
             for symbol in symbols:
                 if symbol in stock_map:
@@ -183,12 +117,8 @@ def get_movers(symbols, date_obj=None, time_obj=None, live=False):
     all_l = sorted([s for s in all_stocks if s[2] < 0], key=lambda x: x[2])
     gainers = sorted([s for s in all_stocks if 0 < s[2] < 3], key=lambda x: x[2], reverse=True)
     losers = sorted([s for s in all_stocks if -3 < s[2] < 0], key=lambda x: x[2])
-    breadth = {
-        "advances": advances, "declines": declines, "unchanged": unchanged,
-        "total": len(all_stocks),
-        "top_gainer": all_g[0] if all_g else None,
-        "top_loser": all_l[0] if all_l else None,
-    }
+    breadth = {"advances": advances, "declines": declines, "unchanged": unchanged, "total": len(all_stocks),
+               "top_gainer": all_g[0] if all_g else None, "top_loser": all_l[0] if all_l else None}
     return gainers[:10], losers[:10], breadth
 
 
@@ -228,8 +158,7 @@ def get_all_sectors_snapshot():
                 total_change += chg
                 count += 1
         avg = total_change / count if count > 0 else 0
-        results.append({"sector": sector, "advances": advances, "declines": declines,
-                        "unchanged": unchanged, "total": count, "avg_change": avg})
+        results.append({"sector": sector, "advances": advances, "declines": declines, "unchanged": unchanged, "total": count, "avg_change": avg})
     results.sort(key=lambda x: x["avg_change"], reverse=True)
     return results
 
@@ -238,11 +167,11 @@ def get_verdict(advances, declines):
     total = advances + declines
     if total == 0: return "No data"
     ratio = advances / total * 100
-    if ratio >= 70: return "STRONGLY BULLISH 🟢"
-    elif ratio >= 55: return "BULLISH 🟢"
-    elif ratio >= 45: return "NEUTRAL ⚪"
-    elif ratio >= 30: return "BEARISH 🔴"
-    else: return "STRONGLY BEARISH 🔴"
+    if ratio >= 70: return "STRONGLY BULLISH"
+    elif ratio >= 55: return "BULLISH"
+    elif ratio >= 45: return "NEUTRAL"
+    elif ratio >= 30: return "BEARISH"
+    else: return "STRONGLY BEARISH"
 
 
 def build_sectors_snapshot(sectors_data, date_label):
@@ -250,10 +179,10 @@ def build_sectors_snapshot(sectors_data, date_label):
     for s in sectors_data:
         label = SECTOR_LABELS.get(s["sector"], s["sector"])
         avg = s["avg_change"]
-        emoji = "🟢" if avg > 0 else "🔴"
+        emoji = "ðŸŸ¢" if avg > 0 else "ðŸ”´"
         sign = "+" if avg > 0 else ""
         lines += f"{emoji} {label:<14}  A:{s['advances']}  D:{s['declines']}  {sign}{avg:.2f}%\n"
-    return (f"━━━━━━━━━━━━━━━━━━━\n📊 *Sector Snapshot*\n📅 {date_label}\n━━━━━━━━━━━━━━━━━━━\n\n{lines}\n_Tap /sector to drill into any sector_\n━━━━━━━━━━━━━━━━━━━")
+    return f"ðŸ“Š *Sector Snapshot*\nðŸ“… {date_label}\n\n{lines}\n_Tap /sector to drill into any sector_"
 
 
 def build_message(gainers, losers, breadth, date_label, time_label=None, sector=None, nifty_change=None):
@@ -269,26 +198,26 @@ def build_message(gainers, losers, breadth, date_label, time_label=None, sector=
     nifty_line = ""
     if nifty_change is not None:
         sign = "+" if nifty_change > 0 else ""
-        emoji = "🟢" if nifty_change > 0 else "🔴"
+        emoji = "ðŸŸ¢" if nifty_change > 0 else "ðŸ”´"
         nifty_line = f"{emoji} Nifty: {sign}{nifty_change:.2f}%\n"
-    top_g_line = f"🏆 Top Gainer: {top_g[0]} +{top_g[2]:.2f}%\n" if top_g else ""
-    top_l_line = f"💀 Top Loser:  {top_l[0]} {top_l[2]:.2f}%\n" if top_l else ""
-    breadth_section = (f"📊 *{sector_label} Breadth* ({total} stocks)\n{nifty_line}"
-                       f"📈 Advances: {adv}   📉 Declines: {dec}   ➡️ {unc} Unchanged\n"
-                       f"📊 Ratio: {adv}:{dec}\n{top_g_line}{top_l_line}🎯 Verdict: *{verdict}*")
+    top_g_line = f"ðŸ† Top Gainer: {top_g[0]} +{top_g[2]:.2f}%\n" if top_g else ""
+    top_l_line = f"ðŸ’€ Top Loser:  {top_l[0]} {top_l[2]:.2f}%\n" if top_l else ""
+    breadth_section = (f"ðŸ“Š *{sector_label} Breadth* ({total} stocks)\n{nifty_line}"
+                       f"ðŸ“ˆ Advances: {adv}   ðŸ“‰ Declines: {dec}   âž¡ï¸ {unc} Unchanged\n"
+                       f"ðŸ“Š Ratio: {adv}:{dec}\n{top_g_line}{top_l_line}ðŸŽ¯ Verdict: *{verdict}*")
 
     def make_table(stocks, is_gainer):
-        lines = "`#   SYMBOL         LTP        CHG%`\n`────────────────────────────────`\n"
+        lines = "`#   SYMBOL         LTP        CHG%`\n`â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€`\n"
         for i, (s, l, c) in enumerate(stocks, 1):
             sign = "+" if is_gainer else ""
             lines += f"`{str(i).ljust(2)}  {s[:12].ljust(12)}  {'Rs'+str(l):<10}  {sign}{c:.2f}%`\n"
         return lines if stocks else "`  None`\n"
 
-    return (f"━━━━━━━━━━━━━━━━━━━\n📊 *{sector_label} — Top 10 Movers*\n"
-            f"📅 {date_label}{time_str}\n_(0% to 3% move only)_\n━━━━━━━━━━━━━━━━━━━\n\n"
-            f"{breadth_section}\n\n━━━━━━━━━━━━━━━━━━━\n✅ *TOP 10 GAINERS* 📈\n"
-            f"{make_table(gainers, True)}\n🔴 *TOP 10 LOSERS* 📉\n"
-            f"{make_table(losers, False)}\n━━━━━━━━━━━━━━━━━━━")
+    return (f"â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nðŸ“Š *{sector_label} â€” Top 10 Movers*\n"
+            f"ðŸ“… {date_label}{time_str}\n_(0% to 3% move only)_\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
+            f"{breadth_section}\n\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\nâœ… *TOP 10 GAINERS* ðŸ“ˆ\n"
+            f"{make_table(gainers, True)}\nðŸ”´ *TOP 10 LOSERS* ðŸ“‰\n"
+            f"{make_table(losers, False)}\nâ”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”")
 
 
 def parse_input(text):
@@ -329,19 +258,19 @@ def send_buttons(chat_id, text, buttons):
 
 def sector_menu(chat_id):
     buttons = [
-        [{"text": "🏦 Bank", "callback_data": "sector_BANK"},
-         {"text": "💻 IT", "callback_data": "sector_IT"},
-         {"text": "🚗 Auto", "callback_data": "sector_AUTO"}],
-        [{"text": "💊 Pharma", "callback_data": "sector_PHARMA"},
-         {"text": "🛒 FMCG", "callback_data": "sector_FMCG"},
-         {"text": "⚙️ Metal", "callback_data": "sector_METAL"}],
-        [{"text": "🏢 Realty", "callback_data": "sector_REALTY"},
-         {"text": "⚡ Energy", "callback_data": "sector_ENERGY"},
-         {"text": "💰 Fin Serv", "callback_data": "sector_FINSERV"}],
-        [{"text": "🏛️ PSU Bank", "callback_data": "sector_PSUBANK"},
-         {"text": "📊 All FnO", "callback_data": "sector_ALL"}]
+        [{"text": "ðŸ¦ Bank", "callback_data": "sector_BANK"},
+         {"text": "ðŸ’» IT", "callback_data": "sector_IT"},
+         {"text": "ðŸš— Auto", "callback_data": "sector_AUTO"}],
+        [{"text": "ðŸ’Š Pharma", "callback_data": "sector_PHARMA"},
+         {"text": "ðŸ›’ FMCG", "callback_data": "sector_FMCG"},
+         {"text": "âš™ï¸ Metal", "callback_data": "sector_METAL"}],
+        [{"text": "ðŸ¢ Realty", "callback_data": "sector_REALTY"},
+         {"text": "âš¡ Energy", "callback_data": "sector_ENERGY"},
+         {"text": "ðŸ’° Fin Serv", "callback_data": "sector_FINSERV"}],
+        [{"text": "ðŸ›ï¸ PSU Bank", "callback_data": "sector_PSUBANK"},
+         {"text": "ðŸ“Š All FnO", "callback_data": "sector_ALL"}]
     ]
-    send_buttons(chat_id, "🏷️ *Select a Sector:*\nTap any sector to get live top gainers and losers!", buttons)
+    send_buttons(chat_id, "ðŸ·ï¸ *Select a Sector:*\nTap any sector to get live top gainers and losers!", buttons)
 
 
 def answer_callback(callback_id):
@@ -351,7 +280,7 @@ def answer_callback(callback_id):
 
 @app.route("/api/webhook", methods=["GET"])
 def home():
-    return "FnO Bot is running! ✅", 200
+    return "FnO Bot is running! âœ…", 200
 
 
 @app.route("/api/webhook", methods=["POST"])
@@ -371,7 +300,7 @@ def webhook():
                 today = datetime.datetime.now(IST).strftime("%d %b %Y")
                 symbols = FNO_SYMBOLS if sector == "ALL" else SECTOR_STOCKS.get(sector, [])
                 label = "All FnO" if sector == "ALL" else SECTOR_LABELS.get(sector, sector)
-                send_msg(chat_id, f"⏳ Fetching {label} data...")
+                send_msg(chat_id, f"â³ Fetching {label} data...")
                 gainers, losers, breadth = get_movers(symbols, live=True)
                 send_msg(chat_id, build_message(gainers, losers, breadth, date_label=today,
                          sector=None if sector == "ALL" else sector, nifty_change=get_nifty_change()))
@@ -385,19 +314,19 @@ def webhook():
             return jsonify({"ok": True})
 
         if text_lower == "/sectors":
-            send_msg(chat_id, "⏳ Fetching all sectors snapshot...")
+            send_msg(chat_id, "â³ Fetching all sectors snapshot...")
             today = datetime.datetime.now(IST).strftime("%d %b %Y")
             send_msg(chat_id, build_sectors_snapshot(get_all_sectors_snapshot(), today))
 
         elif text_lower == "/start":
             send_msg(chat_id,
-                "👋 *FnO Alert Bot*\n\n*Commands:*\n"
-                "📊 `/fno` - Today live top 10\n"
-                "📅 `/fno 29-Apr 9:25` - Any date at time\n"
-                "📈 `/sectors` - All sectors snapshot\n"
-                "🏷️ `/sector` - Browse by sector\n"
-                "🏷️ `/sector bank 29-Apr 9:25` - Sector on any date\n\n"
-                "⏰ Auto alert every weekday at 9:25 AM IST\n"
+                "ðŸ‘‹ *FnO Alert Bot*\n\n*Commands:*\n"
+                "ðŸ“Š `/fno` - Today live top 10\n"
+                "ðŸ“… `/fno 29-Apr 9:25` - Any date at time\n"
+                "ðŸ“ˆ `/sectors` - All sectors snapshot\n"
+                "ðŸ·ï¸ `/sector` - Browse by sector\n"
+                "ðŸ·ï¸ `/sector bank 29-Apr 9:25` - Sector on any date\n\n"
+                "â° Auto alert every weekday at 9:25 AM IST\n"
                 "_Note: Use 9:16 for first candle data_"
             )
 
@@ -411,13 +340,13 @@ def webhook():
                 sector_key = arg_parts[0].upper()
                 rest = arg_parts[1] if len(arg_parts) > 1 else ""
                 if sector_key not in SECTOR_STOCKS:
-                    send_msg(chat_id, "❌ Invalid sector!\nUse: BANK, IT, AUTO, PHARMA, FMCG, METAL, REALTY, ENERGY, FINSERV, PSUBANK")
+                    send_msg(chat_id, "Invalid sector! Use: BANK, IT, AUTO, PHARMA, FMCG, METAL, REALTY, ENERGY, FINSERV, PSUBANK")
                     return jsonify({"ok": True})
                 symbols = SECTOR_STOCKS[sector_key]
                 label = SECTOR_LABELS.get(sector_key, sector_key)
                 if not rest:
                     today = datetime.datetime.now(IST).strftime("%d %b %Y")
-                    send_msg(chat_id, f"⏳ Fetching {label} live data...")
+                    send_msg(chat_id, f"â³ Fetching {label} live data...")
                     gainers, losers, breadth = get_movers(symbols, live=True)
                     send_msg(chat_id, build_message(gainers, losers, breadth, date_label=today,
                              sector=sector_key, nifty_change=get_nifty_change()))
@@ -426,7 +355,7 @@ def webhook():
                     date_label = date_obj.strftime("%d %b %Y")
                     time_obj = time_obj or datetime.time(15, 30)
                     time_label = time_obj.strftime("%I:%M %p")
-                    send_msg(chat_id, f"⏳ Fetching {label} for *{date_label}* at *{time_label}*...")
+                    send_msg(chat_id, f"â³ Fetching {label} for *{date_label}* at *{time_label}*...")
                     gainers, losers, breadth = get_movers(symbols, date_obj=date_obj, time_obj=time_obj)
                     send_msg(chat_id, build_message(gainers, losers, breadth, date_label=date_label,
                              time_label=time_label, sector=sector_key))
@@ -435,26 +364,7 @@ def webhook():
             parts = full_text.split(maxsplit=1)
             args = parts[1].strip() if len(parts) > 1 else ""
             if not args:
-                send_msg(chat_id, "⏳ Fetching live FnO data...")
-                gainers, losers, breadth = get_movers(FNO_SYMBOLS, live=True)
-                today = datetime.datetime.now(IST).strftime("%d %b %Y")
-                send_msg(chat_id, build_message(gainers, losers, breadth, date_label=today,
-                         nifty_change=get_nifty_change()))
-            else:
-                    date_obj, time_obj = parse_input(rest)
-                    date_label = date_obj.strftime("%d %b %Y")
-                    time_obj = time_obj or datetime.time(15, 30)
-                    time_label = time_obj.strftime("%I:%M %p")
-                    send_msg(chat_id, f"⏳ Fetching {label} for *{date_label}* at *{time_label}*...")
-                    gainers, losers, breadth = get_movers(symbols, date_obj=date_obj, time_obj=time_obj)
-                    send_msg(chat_id, build_message(gainers, losers, breadth, date_label=date_label,
-                             time_label=time_label, sector=sector_key))
-
-        elif text_lower.startswith("/fno"):
-            parts = full_text.split(maxsplit=1)
-            args = parts[1].strip() if len(parts) > 1 else ""
-            if not args:
-                send_msg(chat_id, "⏳ Fetching live FnO data...")
+                send_msg(chat_id, "â³ Fetching live FnO data...")
                 gainers, losers, breadth = get_movers(FNO_SYMBOLS, live=True)
                 today = datetime.datetime.now(IST).strftime("%d %b %Y")
                 send_msg(chat_id, build_message(gainers, losers, breadth, date_label=today,
@@ -464,7 +374,7 @@ def webhook():
                 date_label = date_obj.strftime("%d %b %Y")
                 time_obj = time_obj or datetime.time(15, 30)
                 time_label = time_obj.strftime("%I:%M %p")
-                send_msg(chat_id, f"⏳ Fetching *{date_label}* at *{time_label}*...\n_May take 2-3 mins_")
+                send_msg(chat_id, f"â³ Fetching *{date_label}* at *{time_label}*...\n_May take 2-3 mins_")
                 gainers, losers, breadth = get_movers(FNO_SYMBOLS, date_obj=date_obj, time_obj=time_obj)
                 send_msg(chat_id, build_message(gainers, losers, breadth, date_label=date_label,
                          time_label=time_label))
@@ -474,5 +384,4 @@ def webhook():
         if chat_id:
             send_msg(chat_id, f"Error: {str(e)}")
 
-           return jsonify({"ok": True})
-            
+    return jsonify({"ok": True})

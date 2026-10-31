@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 from flask import Flask, request, jsonify
 import requests
 import datetime
@@ -17,7 +16,7 @@ SECTOR_STOCKS = {
     "METAL": ["TATASTEEL","JSWSTEEL","HINDALCO","VEDL","SAIL","NMDC","NATIONALUM","HINDZINC","COALINDIA","APLAPOLLO"],
     "REALTY": ["DLF","GODREJPROP","OBEROIRLTY","PHOENIXLTD","LODHA","PRESTIGE"],
     "ENERGY": ["RELIANCE","ONGC","BPCL","IOC","HINDPETRO","GAIL","OIL","PETRONET","ADANIGREEN","TATAPOWER","ADANIPOWER","NTPC","POWERGRID","NHPC","ADANIENSOL","WAAREEENER","INOXWIND","SOLARINDS","POWERINDIA"],
-    "FINSERV": ["BAJFINANCE","BAJAJFINSV","HDFCLIFE","SBILIFE","ICICIGI","ICICIPRULI","MUTHOOTFIN","CHOLAFIN","SHRIRAMFIN","MANAPPURAM","PNBHOUSING","LICHSGFIN","MFSL","HDFCAMC","ABCAPITAL","IRFC","RECLTD","PFC","IREDA","LTF","ANGELONE","MOTILALOFS","JIOFIN"],
+    "FINSERV": ["BAJFINANCE","BAJAJFINSV","HDFCLIFE","SBILIFE","ICICIGI","ICICILIFE","MUTHOOTFIN","CHOLAFIN","SHRIRAMFIN","MANAPPURAM","PNBHOUSING","LICHSGFIN","MFSL","HDFCAMC","ABCAPITAL","IRFC","RECLTD","PFC","IREDA","LTF","ANGELONE","MOTILALOFS","JIOFIN"],
     "PSUBANK": ["SBIN","BANKBARODA","PNB","CANBK","UNIONBANK","INDIANB","BANKINDIA","MAZDOCK","BDL","COCHINSHIP"]
 }
 
@@ -50,12 +49,13 @@ FNO_SYMBOLS = [
     "TMPV", "TORNTPHARM", "TRENT", "TVSMOTOR", "UJJIVANSFB", "ULTRACEMCO", "UNIONBANK", "UNITDSPR",
     "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", "VOLTAS", "WAAREEENER", "WIPRO",
     "YESBANK", "ZYDUSLIFE",
-]))
-YAHOO_SPECIAL = {"BAJAJ-AUTO":"BAJAJ-AUTO.NS","NAM-INDIA":"NAM-INDIA.NS","360ONE":"360ONE.NS","M&M":"M%26M.NS","GVT&D":"GVT%26D.NS"}
+]
+
+YAHOO_SPECIAL = {"BAJAJ-AUTO": "BAJAJ-AUTO.NS", "NAM-INDIA": "NAM-INDIA.NS", "360ONE": "360ONE.NS", "M&M": "M%26M.NS", "GVT&D": "GVT%26D.NS"}
 
 SECTOR_LABELS = {
-    "BANK":"🏦 Bank","IT":"💻 IT","AUTO":"🚗 Auto","PHARMA":"💊 Pharma","FMCG":"🛒 FMCG",
-    "METAL":"⚙️ Metal","REALTY":"🏢 Realty","ENERGY":"⚡ Energy","FINSERV":"💰 Fin Serv","PSUBANK":"🏛️ PSU Bank"
+    "BANK": "🏦 Bank", "IT": "💻 IT", "AUTO": "🚗 Auto", "PHARMA": "💊 Pharma", "FMCG": "🛒 FMCG",
+    "METAL": "⚙️ Metal", "REALTY": "🏢 Realty", "ENERGY": "⚡ Energy", "FINSERV": "💰 Fin Serv", "PSUBANK": "🏛️ PSU Bank"
 }
 
 
@@ -114,7 +114,10 @@ def get_movers(symbols, date_obj=None, time_obj=None, live=False):
         try:
             r = session.get("https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O", headers=hdrs, timeout=10)
             stock_map = {s.get("symbol"): s for s in r.json().get("data", [])}
-            for symbol in symbols:
+            use_symbols = list(stock_map.keys()) if symbols is FNO_SYMBOLS else symbols
+            for symbol in use_symbols:
+                if symbol == "SECURITIES IN F&O":
+                    continue
                 if symbol in stock_map:
                     s = stock_map[symbol]
                     all_stocks.append((symbol, s.get("lastPrice", 0), s.get("pChange", 0)))
@@ -168,9 +171,12 @@ def get_all_sectors_snapshot():
         for symbol in symbols:
             if symbol in stock_map:
                 chg = stock_map[symbol].get("pChange", 0)
-                if chg > 0: advances += 1
-                elif chg < 0: declines += 1
-                else: unchanged += 1
+                if chg > 0:
+                    advances += 1
+                elif chg < 0:
+                    declines += 1
+                else:
+                    unchanged += 1
                 total_change += chg
                 count += 1
         avg = total_change / count if count > 0 else 0
@@ -180,15 +186,62 @@ def get_all_sectors_snapshot():
     return results
 
 
+def get_nifty50_data():
+    session = requests.Session()
+    hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", "Referer": "https://www.nseindia.com", "Accept": "application/json"}
+    session.get("https://www.nseindia.com", headers=hdrs, timeout=10)
+    try:
+        r = session.get("https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%2050", headers=hdrs, timeout=10)
+        stocks = r.json().get("data", [])
+        all_stocks = []
+        nifty_change = 0
+        for s in stocks:
+            symbol = s.get("symbol", "")
+            ltp = s.get("lastPrice", 0)
+            change_pct = s.get("pChange", 0)
+            if symbol == "NIFTY 50":
+                nifty_change = change_pct
+                continue
+            all_stocks.append((symbol, ltp, change_pct))
+        advances = sum(1 for _, _, c in all_stocks if c > 0)
+        declines = sum(1 for _, _, c in all_stocks if c < 0)
+        unchanged = len(all_stocks) - advances - declines
+        all_g = sorted([s for s in all_stocks if s[2] > 0], key=lambda x: x[2], reverse=True)
+        all_l = sorted([s for s in all_stocks if s[2] < 0], key=lambda x: x[2])
+        gainers = sorted([s for s in all_stocks if 0 < s[2] < 3], key=lambda x: x[2], reverse=True)
+        losers = sorted([s for s in all_stocks if -3 < s[2] < 0], key=lambda x: x[2])
+        breadth = {"advances": advances, "declines": declines, "unchanged": unchanged,
+                   "total": len(all_stocks), "nifty_change": nifty_change,
+                   "top_gainer": all_g[0] if all_g else None, "top_loser": all_l[0] if all_l else None}
+        return gainers[:5], losers[:5], breadth, all_g[:5], all_l[:5]
+    except Exception as e:
+        print(f"Nifty50 error: {e}")
+        return [], [], {}, [], []
+
+
 def get_verdict(advances, declines):
     total = advances + declines
-    if total == 0: return "No data"
+    if total == 0:
+        return "No data"
     ratio = advances / total * 100
-    if ratio >= 70: return "STRONGLY BULLISH 🟢"
-    elif ratio >= 55: return "BULLISH 🟢"
-    elif ratio >= 45: return "NEUTRAL ⚪"
-    elif ratio >= 30: return "BEARISH 🔴"
-    else: return "STRONGLY BEARISH 🔴"
+    if ratio >= 70:
+        return "STRONGLY BULLISH 🟢"
+    elif ratio >= 55:
+        return "BULLISH 🟢"
+    elif ratio >= 45:
+        return "NEUTRAL ⚪"
+    elif ratio >= 30:
+        return "BEARISH 🔴"
+    else:
+        return "STRONGLY BEARISH 🔴"
+
+
+def make_table(stocks, is_gainer):
+    lines = "`#   SYMBOL         LTP        CHG%`\n`────────────────────────────────`\n"
+    for i, (s, l, c) in enumerate(stocks, 1):
+        sign = "+" if is_gainer else ""
+        lines += f"`{str(i).ljust(2)}  {s[:12].ljust(12)}  {'Rs' + str(l):<10}  {sign}{c:.2f}%`\n"
+    return lines if stocks else "`  None`\n"
 
 
 def build_sectors_snapshot(sectors_data, date_label):
@@ -199,7 +252,8 @@ def build_sectors_snapshot(sectors_data, date_label):
         emoji = "🟢" if avg > 0 else "🔴"
         sign = "+" if avg > 0 else ""
         lines += f"{emoji} {label:<14}  A:{s['advances']}  D:{s['declines']}  {sign}{avg:.2f}%\n"
-    return f"━━━━━━━━━━━━━━━━━━━\n📊 *Sector Snapshot*\n📅 {date_label}\n━━━━━━━━━━━━━━━━━━━\n\n{lines}\n_Tap /sector to drill into any sector_\n━━━━━━━━━━━━━━━━━━━"
+    return (f"━━━━━━━━━━━━━━━━━━━\n📊 *Sector Snapshot*\n📅 {date_label}\n━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{lines}\n_Tap /sector to drill into any sector_\n━━━━━━━━━━━━━━━━━━━")
 
 
 def build_message(gainers, losers, breadth, date_label, time_label=None, sector=None, nifty_change=None):
@@ -222,19 +276,33 @@ def build_message(gainers, losers, breadth, date_label, time_label=None, sector=
     breadth_section = (f"📊 *{sector_label} Breadth* ({total} stocks)\n{nifty_line}"
                        f"📈 Advances: {adv}   📉 Declines: {dec}   ➡️ {unc} Unchanged\n"
                        f"📊 Ratio: {adv}:{dec}\n{top_g_line}{top_l_line}🎯 Verdict: *{verdict}*")
-
-    def make_table(stocks, is_gainer):
-        lines = "`#   SYMBOL         LTP        CHG%`\n`────────────────────────────────`\n"
-        for i, (s, l, c) in enumerate(stocks, 1):
-            sign = "+" if is_gainer else ""
-            lines += f"`{str(i).ljust(2)}  {s[:12].ljust(12)}  {'Rs'+str(l):<10}  {sign}{c:.2f}%`\n"
-        return lines if stocks else "`  None`\n"
-
     return (f"━━━━━━━━━━━━━━━━━━━\n📊 *{sector_label} — Top 10 Movers*\n"
             f"📅 {date_label}{time_str}\n_(0% to 3% move only)_\n━━━━━━━━━━━━━━━━━━━\n\n"
             f"{breadth_section}\n\n━━━━━━━━━━━━━━━━━━━\n✅ *TOP 10 GAINERS* 📈\n"
             f"{make_table(gainers, True)}\n🔴 *TOP 10 LOSERS* 📉\n"
             f"{make_table(losers, False)}\n━━━━━━━━━━━━━━━━━━━")
+
+
+def build_nifty50_message(gainers, losers, breadth, top_g_all, top_l_all, date_label):
+    adv = breadth.get("advances", 0)
+    dec = breadth.get("declines", 0)
+    unc = breadth.get("unchanged", 0)
+    nifty_change = breadth.get("nifty_change", 0)
+    top_g = breadth.get("top_gainer")
+    top_l = breadth.get("top_loser")
+    verdict = get_verdict(adv, dec)
+    sign = "+" if nifty_change > 0 else ""
+    nifty_emoji = "🟢" if nifty_change > 0 else "🔴"
+    top_g_line = f"🏆 Top Gainer: {top_g[0]} +{top_g[2]:.2f}%\n" if top_g else ""
+    top_l_line = f"💀 Top Loser:  {top_l[0]} {top_l[2]:.2f}%\n" if top_l else ""
+    return (f"━━━━━━━━━━━━━━━━━━━\n📊 *Nifty 50 Snapshot*\n📅 {date_label}\n━━━━━━━━━━━━━━━━━━━\n\n"
+            f"{nifty_emoji} *Nifty 50: {sign}{nifty_change:.2f}%*\n"
+            f"📈 Advances: {adv}   📉 Declines: {dec}   ➡️ {unc} Unchanged\n"
+            f"📊 Ratio: {adv}:{dec}\n{top_g_line}{top_l_line}🎯 Verdict: *{verdict}*\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n✅ *TOP 5 GAINERS (0-3%)* 📈\n{make_table(gainers, True)}\n"
+            f"🔴 *TOP 5 LOSERS (0-3%)* 📉\n{make_table(losers, False)}\n"
+            f"━━━━━━━━━━━━━━━━━━━\n🏆 *TOP 5 OVERALL GAINERS* 📈\n{make_table(top_g_all, True)}\n"
+            f"💀 *TOP 5 OVERALL LOSERS* 📉\n{make_table(top_l_all, False)}\n━━━━━━━━━━━━━━━━━━━")
 
 
 def parse_input(text):
@@ -247,7 +315,8 @@ def parse_input(text):
         for fmt in ["%d-%m-%Y", "%d-%b-%Y", "%d-%b", "%Y-%m-%d"]:
             try:
                 dt = datetime.datetime.strptime(parts[0], fmt)
-                if fmt == "%d-%b": dt = dt.replace(year=today.year)
+                if fmt == "%d-%b":
+                    dt = dt.replace(year=today.year)
                 date_obj = dt
                 break
             except Exception:
@@ -330,7 +399,13 @@ def webhook():
         if not chat_id:
             return jsonify({"ok": True})
 
-        if text_lower == "/sectors":
+        if text_lower == "/nifty50":
+            send_msg(chat_id, "⏳ Fetching Nifty 50 data...")
+            today = datetime.datetime.now(IST).strftime("%d %b %Y")
+            gainers, losers, breadth, top_g_all, top_l_all = get_nifty50_data()
+            send_msg(chat_id, build_nifty50_message(gainers, losers, breadth, top_g_all, top_l_all, today))
+
+        elif text_lower == "/sectors":
             send_msg(chat_id, "⏳ Fetching all sectors snapshot...")
             today = datetime.datetime.now(IST).strftime("%d %b %Y")
             send_msg(chat_id, build_sectors_snapshot(get_all_sectors_snapshot(), today))
@@ -340,6 +415,7 @@ def webhook():
                 "👋 *FnO Alert Bot*\n\n*Commands:*\n"
                 "📊 `/fno` - Today live top 10\n"
                 "📅 `/fno 29-Apr 9:25` - Any date at time\n"
+                "📊 `/nifty50` - Nifty 50 snapshot\n"
                 "📈 `/sectors` - All sectors snapshot\n"
                 "🏷️ `/sector` - Browse by sector\n"
                 "🏷️ `/sector bank 29-Apr 9:25` - Sector on any date\n\n"
